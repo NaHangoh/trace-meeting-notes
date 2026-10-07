@@ -48,12 +48,13 @@
 - 테스트: rejectsBlank(매개변수화, NBSP 포함), rejectsNullAsBlank, rejectsOverMaxLength, acceptsExactlyMaxLength, rejectsNul, countsCodePointsAfterCrlfNormalization, exceptionMessageDoesNotContainInput(NUL·TOO_LONG), ScriptSplitterTest.nbspOnlyLineGetsNoNumber
 - reviewer 후 결정: 발언 0개는 400(NO_UTTERANCES, 검사는 W4·W6 서비스에서 분할 뒤), 공백 기준을 Whitespace로 통일(NBSP 포함)
 
-### W3. 공통 오류 응답과 413 필터 ✅ 완료 (커밋 해시는 다음 커밋에서 기록)
+### W3. 공통 오류 응답과 413 필터 ✅ 완료 (ed8517a)
 - common: ApiError, ApiExceptionHandler, RequestSizeLimitFilter, AppProperties, CorsConfig (+ @ConfigurationPropertiesScan, app.* 설정)
 - 테스트(RequestLimitAndErrorTest, 시험용 ProbeController): bodyOver200KbReturns413WithContentLength, bodyOver200KbReturns413WhenChunked, body3MbIsRejectedBeforeController, bodyOfExactly200KbIsAccepted, errorResponseDoesNotEchoInput, unhandledExceptionReturns500WithoutDetails, methodNotAllowedKeepsStatusAndAllowHeader, corsAllowsOnlyConfiguredOrigin
 - 200KB = 204,800바이트 (SPEC S3). W7 프론트도 같은 값
 - 3MB 요청 실제 동작: Content-Length·chunked 모두 413, 컨트롤러 호출 0회
 - reviewer 반영: 405 응답의 Allow 헤더 유지
+- 후속(W3 커밋 뒤): CORS 허용 주소에 `*`가 있으면 시작 실패(AppProperties), 테스트 AppPropertiesTest(corsWildcardFailsStartup, explicitOriginsStartNormally). 3MB 테스트는 필터를 끄면 실패함을 확인
 
 ### W4. 미리보기 API
 - PreviewController: `{ utteranceCount, speakers }`만 반환, 저장·본문 로그 없음
@@ -69,6 +70,7 @@
 - 작업 생성: createsJobWithUuidV4AndStoresUtterances, previewMatchesJobSplit, createJobRejectsBlankOverLengthNul, createJobRejectsNoUtterances
 - 요청 수 제한(S4): jobCreationOverLimitReturns429, jobLimitUsesSeparateConfig
 - 보관 기간(S2): deletesJobsAndUtterancesOlderThanRetention(24시간 1분), keepsJobsWithinRetention(23시간 59분), retentionIsConfigurable. 스케줄 메서드를 직접 호출해 테스트
+- 로그에는 작업 ID 대신 경로 패턴만 남긴다 (작업 ID가 곧 열람 권한). 테스트: jobIdNotInLogs
 - 정리(LLM) 시작은 F2에서 붙인다
 
 ### W7. 파일 읽기 (프론트)
@@ -84,5 +86,6 @@
 - 빈 입력 최종 판정은 미리보기 응답 기준이다 (프론트 trim()과 서버 공백 기준이 다를 수 있음)
 
 ## F1 완료 후
+- 배포 시 CORS 주소를 프로필·환경 변수로 지정 (기본값 http://localhost:5173은 개발용)
 - 클라우드 리뷰 1회 (명령 이름은 그때 확인. 분할 규칙, 요청 수 제한, 보관 기간 삭제 집중)
 - F2 계획 시 로컬 LLM 실행기 결정: OpenAI 호환 로컬 클라이언트 하나로 llama.cpp(Vulkan)와 Ollama를 설정으로 바꿔 끼우고 eval로 속도·근거 탐지율 비교 (ADR 0002 갱신)
