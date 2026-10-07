@@ -48,9 +48,12 @@
 - 테스트: rejectsBlank(매개변수화, NBSP 포함), rejectsNullAsBlank, rejectsOverMaxLength, acceptsExactlyMaxLength, rejectsNul, countsCodePointsAfterCrlfNormalization, exceptionMessageDoesNotContainInput(NUL·TOO_LONG), ScriptSplitterTest.nbspOnlyLineGetsNoNumber
 - reviewer 후 결정: 발언 0개는 400(NO_UTTERANCES, 검사는 W4·W6 서비스에서 분할 뒤), 공백 기준을 Whitespace로 통일(NBSP 포함)
 
-### W3. 공통 오류 응답과 413 필터
-- common: ApiExceptionHandler, RequestSizeLimitFilter, AppProperties, CorsConfig
-- 테스트: bodyOver200KbReturns413(Content-Length 있음 / chunked), errorResponseDoesNotEchoInput
+### W3. 공통 오류 응답과 413 필터 ✅ 완료 (커밋 해시는 다음 커밋에서 기록)
+- common: ApiError, ApiExceptionHandler, RequestSizeLimitFilter, AppProperties, CorsConfig (+ @ConfigurationPropertiesScan, app.* 설정)
+- 테스트(RequestLimitAndErrorTest, 시험용 ProbeController): bodyOver200KbReturns413WithContentLength, bodyOver200KbReturns413WhenChunked, body3MbIsRejectedBeforeController, bodyOfExactly200KbIsAccepted, errorResponseDoesNotEchoInput, unhandledExceptionReturns500WithoutDetails, methodNotAllowedKeepsStatusAndAllowHeader, corsAllowsOnlyConfiguredOrigin
+- 200KB = 204,800바이트 (SPEC S3). W7 프론트도 같은 값
+- 3MB 요청 실제 동작: Content-Length·chunked 모두 413, 컨트롤러 호출 0회
+- reviewer 반영: 405 응답의 Allow 헤더 유지
 
 ### W4. 미리보기 API
 - PreviewController: `{ utteranceCount, speakers }`만 반환, 저장·본문 로그 없음
