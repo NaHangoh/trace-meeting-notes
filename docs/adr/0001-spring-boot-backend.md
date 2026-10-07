@@ -10,10 +10,12 @@
 - NestJS + TypeScript: 프론트와 같은 언어라 빠르지만, 기존 업무에서 이미 쓰는 스택이라 새로 보여주는 것이 적음.
 
 ## 결정
-Spring Boot 4 + Java 21. Spring AI는 시작 시점의 최신 안정 버전을 확인해 고른다.
+Spring Boot 4.1 + Java 21 (Gradle 툴체인). Spring AI는 F2에서 Boot 4에 맞는 버전을 확인해 추가한다.
 
 ## 변경 (2026-10-07): Spring Boot 3 → 4
-- 이유: 구현 시작 시점에 Spring Boot 3.5의 오픈소스 지원 기간이 끝나 보안 패치를 받을 수 없다.
+- 처음 결정은 Spring Boot 3이었다. 구현을 시작하며 아래 이유로 4로 바꿨다.
+- 이유 1: Spring Boot 3.5의 오픈소스 지원이 2026-06-30에 끝났다. 구현 시작 시점(2026-10)에는 보안 패치를 받을 수 없다.
+- 이유 2: Spring AI 2.0은 Spring Boot 4를 기반으로 한다. Boot 3에 머물면 F2에서 Spring AI 최신 버전을 쓸 수 없다.
 - 시작 버전: Spring Boot 4.1.1 (Maven Central 기준 최신 정식 버전), Gradle 9.8.0 wrapper(배포본 sha256 검증).
 - Java 21은 Gradle 툴체인으로 고정한다. 시스템 기본 JDK와 관계없이 빌드한다. 툴체인 자동 다운로드는 끈다.
 - Spring Boot 4는 자동 설정이 모듈로 나뉘어 기술별 스타터(`spring-boot-starter-webmvc`, `spring-boot-starter-flyway` 등)와 테스트 스타터(`*-test`)를 쓴다.
