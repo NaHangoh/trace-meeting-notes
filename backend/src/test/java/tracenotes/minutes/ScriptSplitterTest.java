@@ -175,7 +175,7 @@ class ScriptSplitterTest {
 
     @Test
     void ideographicSpaceCountsAsWordSeparator() {
-        String threeWords = "김민수　팀장　님";
+        String threeWords = "김민수\u3000팀장\u3000님";
 
         List<Utterance> result = splitter.split("이영희: 네\n" + threeWords + ": 확인");
 
@@ -207,7 +207,7 @@ class ScriptSplitterTest {
 
     @Test
     void consecutiveSpacesInSpeakerAreCollapsed() {
-        List<Utterance> result = splitter.split("김민수  팀장: 하나\n김민수　팀장: 둘\n김민수 팀장: 셋");
+        List<Utterance> result = splitter.split("김민수  팀장: 하나\n김민수\u3000팀장: 둘\n김민수 팀장: 셋");
 
         assertThat(result).extracting(Utterance::speaker).containsOnly("김민수 팀장");
         assertThat(ScriptSplitter.speakersOf(result)).containsExactly("김민수 팀장");
@@ -236,6 +236,15 @@ class ScriptSplitterTest {
         assertThat(result).containsExactly(
                 new Utterance(1, "이영희", "네"),
                 new Utterance(2, "김민수", "다음 안건입니다"));
+    }
+
+    @Test
+    void nbspOnlyLineGetsNoNumber() {
+        List<Utterance> result = splitter.split("김민수: 하나\n\u00A0\u00A0\n이영희:\u00A0\n둘\u00A0");
+
+        assertThat(result).containsExactly(
+                new Utterance(1, "김민수", "하나"),
+                new Utterance(2, "이영희", "둘"));
     }
 
     @Test

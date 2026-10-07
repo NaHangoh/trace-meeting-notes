@@ -43,8 +43,10 @@
 - 테스트: splitsEachLineWithSequentialNumbers, continuationLineInheritsSpeaker, firstLineWithoutSpeakerIsUnknown, speakerOnlyLineSetsSpeakerWithoutNumber, colonFollowedByDigitIsNotSpeaker, digitsOnlyPrefixIsNotSpeaker, headerWordIsNotSpeaker(매개변수화), prefixOver20CharsIsNotSpeaker, prefixOver2WordsIsNotSpeaker, twoWordSpeakerIsRecognized, handlesCrlf, speakersInFirstAppearanceOrderWithUnknownLast, headerWordsMatchSpec, ideographicSpaceCountsAsWordSeparator, supplementaryPlaneDigitsAreDigits, digitAfterColonWithLetterBeforeIsSpeaker, prefixWithLetterAndDigitIsSpeaker, headerWordAnywhereInPrefixIsNotSpeaker, consecutiveSpacesInSpeakerAreCollapsed, leadingWhitespaceBeforeSpeakerIsAllowed, colonAtLineStartIsNotSpeaker, whitespaceOnlyAfterColonSetsSpeakerWithoutNumber, speakerOnlyLastLineCreatesNoUtterance
 - reviewer 반영: 공백 기준 불일치(전각 공백), 보충 평면 숫자 판정
 
-### W2. ScriptValidator
-- 테스트: rejectsBlank, rejectsOverMaxLength, acceptsExactlyMaxLength, rejectsNul, countsCodePointsAfterCrlfNormalization
+### W2. ScriptValidator ✅ 완료 (커밋 해시는 다음 계획 갱신 때 기록)
+- 패키지 tracenotes.minutes: ScriptValidator, InvalidScriptException(사유 BLANK, TOO_LONG, CONTAINS_NUL, NO_UTTERANCES), Whitespace(검사·분할 공통 공백 기준) (순수 Java)
+- 테스트: rejectsBlank(매개변수화, NBSP 포함), rejectsNullAsBlank, rejectsOverMaxLength, acceptsExactlyMaxLength, rejectsNul, countsCodePointsAfterCrlfNormalization, exceptionMessageDoesNotContainInput(NUL·TOO_LONG), ScriptSplitterTest.nbspOnlyLineGetsNoNumber
+- reviewer 후 결정: 발언 0개는 400(NO_UTTERANCES, 검사는 W4·W6 서비스에서 분할 뒤), 공백 기준을 Whitespace로 통일(NBSP 포함)
 
 ### W3. 공통 오류 응답과 413 필터
 - common: ApiExceptionHandler, RequestSizeLimitFilter, AppProperties, CorsConfig
@@ -52,7 +54,7 @@
 
 ### W4. 미리보기 API
 - PreviewController: `{ utteranceCount, speakers }`만 반환, 저장·본문 로그 없음
-- 테스트: returnsCountAndSpeakersOnly, blankReturns400, overLengthReturns400, nulReturns400, doesNotPersistAnything, doesNotLogInputBody
+- 테스트: returnsCountAndSpeakersOnly, blankReturns400, overLengthReturns400, nulReturns400, noUtterancesReturns400, doesNotPersistAnything, doesNotLogInputBody
 
 ### W5. IpRateLimiter와 미리보기 제한
 - common: IpRateLimiter, ClockConfig(시계 Bean)
@@ -61,7 +63,7 @@
 
 ### W6. 작업 생성, 작업 생성 요청 수 제한, 보관 기간 삭제
 - JobController, JobService, Job, JobUtterance, 저장소, RetentionCleanupJob
-- 작업 생성: createsJobWithUuidV4AndStoresUtterances, previewMatchesJobSplit, createJobRejectsBlankOverLengthNul
+- 작업 생성: createsJobWithUuidV4AndStoresUtterances, previewMatchesJobSplit, createJobRejectsBlankOverLengthNul, createJobRejectsNoUtterances
 - 요청 수 제한(S4): jobCreationOverLimitReturns429, jobLimitUsesSeparateConfig
 - 보관 기간(S2): deletesJobsAndUtterancesOlderThanRetention(24시간 1분), keepsJobsWithinRetention(23시간 59분), retentionIsConfigurable. 스케줄 메서드를 직접 호출해 테스트
 - 정리(LLM) 시작은 F2에서 붙인다
@@ -76,6 +78,7 @@
 - ScriptInputPage.tsx, usePreview.ts(React Query, 500ms 디바운스), api/client.ts
 - 테스트: startDisabledWithGuidanceWhenBlank, callsPreviewOnceAfter500msIdle, showsSummaryLine, overLimitShowsCountAndBlocksStart, filePickFillsTextarea, fileErrorShowsReason, jobCreation429ShowsRetryMessage
 - 미리보기 API가 400·429를 돌려주면 요약 줄을 숨긴다
+- 빈 입력 최종 판정은 미리보기 응답 기준이다 (프론트 trim()과 서버 공백 기준이 다를 수 있음)
 
 ## F1 완료 후
 - 클라우드 리뷰 1회 (명령 이름은 그때 확인. 분할 규칙, 요청 수 제한, 보관 기간 삭제 집중)

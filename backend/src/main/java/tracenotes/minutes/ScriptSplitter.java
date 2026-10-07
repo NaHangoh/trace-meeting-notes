@@ -18,16 +18,16 @@ public class ScriptSplitter {
         String speaker = UNKNOWN_SPEAKER;
 
         for (String line : script.replace("\r\n", "\n").split("\n")) {
-            if (line.isBlank()) {
+            if (Whitespace.isBlank(line)) {
                 continue;
             }
             String marked = speakerMark(line);
             if (marked == null) {
-                utterances.add(new Utterance(utterances.size() + 1, speaker, line.strip()));
+                utterances.add(new Utterance(utterances.size() + 1, speaker, Whitespace.strip(line)));
                 continue;
             }
             speaker = marked;
-            String content = line.substring(line.indexOf(':') + 1).strip();
+            String content = Whitespace.strip(line.substring(line.indexOf(':') + 1));
             if (!content.isEmpty()) {
                 utterances.add(new Utterance(utterances.size() + 1, speaker, content));
             }
@@ -82,12 +82,12 @@ public class ScriptSplitter {
         return prefix;
     }
 
-    /** strip()과 같은 공백 기준(Character.isWhitespace, 전각 공백 포함)으로 단어를 나눈다. */
+    /** Whitespace 기준(NBSP·전각 공백 포함)으로 단어를 나눈다. */
     private static List<String> words(String text) {
         List<String> words = new ArrayList<>();
         StringBuilder word = new StringBuilder();
         for (int cp : text.codePoints().toArray()) {
-            if (Character.isWhitespace(cp)) {
+            if (Whitespace.isSpace(cp)) {
                 if (!word.isEmpty()) {
                     words.add(word.toString());
                     word.setLength(0);
