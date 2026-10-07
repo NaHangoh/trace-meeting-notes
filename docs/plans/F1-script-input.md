@@ -43,7 +43,7 @@
 - 테스트: splitsEachLineWithSequentialNumbers, continuationLineInheritsSpeaker, firstLineWithoutSpeakerIsUnknown, speakerOnlyLineSetsSpeakerWithoutNumber, colonFollowedByDigitIsNotSpeaker, digitsOnlyPrefixIsNotSpeaker, headerWordIsNotSpeaker(매개변수화), prefixOver20CharsIsNotSpeaker, prefixOver2WordsIsNotSpeaker, twoWordSpeakerIsRecognized, handlesCrlf, speakersInFirstAppearanceOrderWithUnknownLast, headerWordsMatchSpec, ideographicSpaceCountsAsWordSeparator, supplementaryPlaneDigitsAreDigits, digitAfterColonWithLetterBeforeIsSpeaker, prefixWithLetterAndDigitIsSpeaker, headerWordAnywhereInPrefixIsNotSpeaker, consecutiveSpacesInSpeakerAreCollapsed, leadingWhitespaceBeforeSpeakerIsAllowed, colonAtLineStartIsNotSpeaker, whitespaceOnlyAfterColonSetsSpeakerWithoutNumber, speakerOnlyLastLineCreatesNoUtterance
 - reviewer 반영: 공백 기준 불일치(전각 공백), 보충 평면 숫자 판정
 
-### W2. ScriptValidator ✅ 완료 (커밋 해시는 다음 계획 갱신 때 기록)
+### W2. ScriptValidator ✅ 완료 (2c7cbe5)
 - 패키지 tracenotes.minutes: ScriptValidator, InvalidScriptException(사유 BLANK, TOO_LONG, CONTAINS_NUL, NO_UTTERANCES), Whitespace(검사·분할 공통 공백 기준) (순수 Java)
 - 테스트: rejectsBlank(매개변수화, NBSP 포함), rejectsNullAsBlank, rejectsOverMaxLength, acceptsExactlyMaxLength, rejectsNul, countsCodePointsAfterCrlfNormalization, exceptionMessageDoesNotContainInput(NUL·TOO_LONG), ScriptSplitterTest.nbspOnlyLineGetsNoNumber
 - reviewer 후 결정: 발언 0개는 400(NO_UTTERANCES, 검사는 W4·W6 서비스에서 분할 뒤), 공백 기준을 Whitespace로 통일(NBSP 포함)
