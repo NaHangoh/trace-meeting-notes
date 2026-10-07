@@ -1,0 +1,99 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew *)",
+      "Bash(gradlew *)",
+      "Bash(gradlew.bat *)",
+      "Bash(npm run *)",
+      "Bash(npm test)",
+      "Bash(npm test *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(ollama list)"
+    ],
+    "ask": [
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git switch*)",
+      "Bash(git restore*)",
+      "Bash(git stash*)",
+      "Bash(npm install*)",
+      "Bash(npm i *)",
+      "Bash(npm ci*)",
+      "Bash(npm add*)",
+      "Bash(npm uninstall*)",
+      "Bash(npx *)",
+      "Bash(pnpm *)",
+      "Bash(yarn *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(Invoke-WebRequest*)",
+      "Bash(iwr *)",
+      "Bash(docker *)",
+      "Edit(./CLAUDE.md)",
+      "Edit(./.claude/rules/**)",
+      "Edit(./.claude/skills/**)",
+      "Edit(./.claude/agents/**)",
+      "Edit(./**/build.gradle*)",
+      "Edit(./**/settings.gradle*)",
+      "Edit(./**/gradle.properties)",
+      "Edit(./**/gradle/libs.versions.toml)",
+      "Edit(./**/gradle/wrapper/**)",
+      "Edit(./**/package.json)",
+      "Edit(./**/package-lock.json)",
+      "Edit(./.github/**)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*.local)",
+      "Read(./**/application-secret*.yml)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Edit(./.claude/settings.json)",
+      "Edit(./.claude/settings.local.json)",
+      "Edit(./.claude/hooks/**)",
+      "Edit(./.mcp.json)",
+      "Edit(./.git/**)",
+      "Edit(./eval/cases/**/expected*)",
+      "Edit(./eval/cases/**/planted*)",
+      "Bash(git push*)",
+      "Bash(git remote*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "mcp__*"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  },
+  "enableAllProjectMcpServers": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-files.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-bash.js\""
+          }
+        ]
+      }
+    ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  }
+}

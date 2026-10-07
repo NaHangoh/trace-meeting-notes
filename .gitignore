@@ -1,0 +1,28 @@
+# 비밀값
+.env
+.env.*
+!.env.example
+*secret*
+*.pem
+*.key
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+CLAUDE.local.md
+
+# 빌드
+backend/build/
+backend/.gradle/
+frontend/node_modules/
+frontend/dist/
+
+# IDE, OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# 생성 파일
+*.docx
+!eval/**/*.docx
