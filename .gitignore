@@ -23,6 +23,11 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# 로컬 DB 파일 (H2, 실행 위치 기준 ./data/)
+data/
+*.mv.db
+*.trace.db
+
 # 생성 파일
 *.docx
 !eval/**/*.docx

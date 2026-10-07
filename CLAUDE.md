@@ -4,16 +4,27 @@
 AI 개발 환경 전체 설명: docs/AI-ENV.md · 위협과 한계: docs/THREAT-MODEL.md
 
 ## 구조
-- `backend/` Spring Boot 3, Java 21, Spring AI
+- `backend/` Spring Boot 4.1 (Java 21, Gradle 툴체인), Spring AI는 F2에서 추가
 - `frontend/` React, TypeScript, Vite, Tailwind, PWA
 - `prompts/` 제품 프롬프트 (버전 관리)
 - `eval/` 가상 회의 데이터와 근거 검증 정확도 측정
 - `docs/` SPEC.md, ARCHITECTURE.md, adr/, AI-ENV.md, AI-WORKFLOW.md
 
 ## 명령어
-- 프로젝트 골격을 만든 뒤 빌드, 테스트, 실행, 포맷 명령을 여기에 채운다.
+- 백엔드 (`backend/`, Java 21)
+  - 테스트: `./gradlew test` (`@Tag("llm")` 제외)
+  - 빌드: `./gradlew build`
+  - 실행: `./gradlew bootRun`
+- 프론트엔드 (`frontend/`, Node >=22.22.2)
+  - 설치: `npm ci` (잠금 파일 기준)
+  - 테스트: `npm test`
+  - 타입 검사: `npm run typecheck`
+  - 빌드: `npm run build`
+  - 실행: `npm run dev`
+- 포맷: 아직 포맷터를 두지 않았다. 추가는 의존성 확인 절차를 거친다.
 
 ## 핵심 원칙 (IMPORTANT)
+- 사용자에게는 한국어로 답한다.
 - 구현 전에 docs/SPEC.md를 읽는다. SPEC에 없는 기능은 만들지 말고 먼저 묻는다.
 - "완료"는 테스트 실행 결과를 보여준 뒤에만 말한다.
 - LLM은 `LlmClient` 뒤에 둔다. 자동 테스트는 실제 LLM을 부르지 않는다.

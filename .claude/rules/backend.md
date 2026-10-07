@@ -1,6 +1,6 @@
 # 백엔드 규칙 (backend/)
 
-- Java 21, Spring Boot 3, Gradle. 패키지는 기능 단위(`minutes`, `evidence`, `export`, `llm`)로 나눈다.
+- Spring Boot 4.1 (Java 21, Gradle 툴체인). Spring AI는 F2에서 추가. 패키지는 기능 단위(`minutes`, `evidence`, `export`, `llm`)로 나눈다.
 - 컨트롤러는 요청·응답 변환만, 로직은 서비스, 외부 연동(LLM, 파일 생성)은 별도 컴포넌트.
 - 긴 작업(정리·검증)은 비동기로 처리하고 작업 ID로 상태를 조회한다. 요청 스레드에서 LLM 응답을 기다리지 않는다.
 - 예외는 공통 핸들러에서 일관된 오류 응답으로 바꾼다. 내부 예외 메시지를 그대로 노출하지 않는다.

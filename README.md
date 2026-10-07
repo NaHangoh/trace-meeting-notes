@@ -11,7 +11,7 @@
 - 모델 교체 가능 (Ollama 로컬 모델 / Claude), 모델별 정확도 비교
 
 ## 기술
-Spring Boot 3, Java 21, Spring AI / React, TypeScript, Vite, Tailwind, PWA
+Spring Boot 4.1 (Java 21, Gradle 툴체인), Spring AI는 F2에서 추가 / React, TypeScript, Vite, Tailwind, PWA
 
 ## AI로 개발하는 방식
 이 프로젝트는 AI 코딩 에이전트로 개발한다. 규칙, 권한, 차단 훅, 검증 에이전트 구성은 [docs/AI-ENV.md](docs/AI-ENV.md), 작업 기록은 [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md).
