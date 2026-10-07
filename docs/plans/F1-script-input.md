@@ -59,6 +59,8 @@
 ### W4. 미리보기 API
 - PreviewController: `{ utteranceCount, speakers }`만 반환, 저장·본문 로그 없음
 - 테스트: returnsCountAndSpeakersOnly, blankReturns400, overLengthReturns400, nulReturns400, noUtterancesReturns400, doesNotPersistAnything, doesNotLogInputBody
+- 설정값 검증(AppProperties): invalidLimitsFailStartup(매개변수화) — maxScriptChars는 1~1,000,000, maxRequestBytes는 1~10,485,760(10MB)을 벗어나면(0·음수·초과) 시작 실패
+- 설정값 검증(AppProperties): limitsAreConsistent — maxRequestBytes가 maxScriptChars × 4 + 여유분(JSON 감싸는 부분)보다 작으면 시작 실패. 기본값 50,000자·204,800바이트는 통과해야 한다. 여유분 값은 구현 때 정해 보고한다
 
 ### W5. IpRateLimiter와 미리보기 제한
 - common: IpRateLimiter, ClockConfig(시계 Bean)
@@ -87,5 +89,15 @@
 
 ## F1 완료 후
 - 배포 시 CORS 주소를 프로필·환경 변수로 지정 (기본값 http://localhost:5173은 개발용)
+
+### 배포 시 점검 (CORS 설정을 잘못 쓴 경우, 시작 검증으로 잡히지 않음)
+- 오타·잘못된 포트·http/https 혼동: 실제 프론트가 막히는데 시작은 정상으로 된다
+- 출처 형식이 아닌 값(`localhost:5173`, `http://host/path`): 아무것과도 일치하지 않아 실수를 알아채기 어렵다
+- 운영 설정에 http 주소나 공유·제3자 도메인(호스팅 하위 도메인 등)이 남지 않았는지
+- 같은 주소의 중복(`http://a`와 `http://a/`)
+- 비ASCII·punycode로 만든 비슷한 도메인, 값 안의 제어 문자
+- `app.cors-allowed-origins=`처럼 빈 값: 빈 목록(허용 없음)이 되거나 시작 실패
+- 환경 변수 `APP_CORS_ALLOWED_ORIGINS`나 프로필별 yml이 기대한 값을 덮어쓰지 않았는지
+
 - 클라우드 리뷰 1회 (명령 이름은 그때 확인. 분할 규칙, 요청 수 제한, 보관 기간 삭제 집중)
 - F2 계획 시 로컬 LLM 실행기 결정: OpenAI 호환 로컬 클라이언트 하나로 llama.cpp(Vulkan)와 Ollama를 설정으로 바꿔 끼우고 eval로 속도·근거 탐지율 비교 (ADR 0002 갱신)
