@@ -3,7 +3,8 @@ spring:
     name: trace-meeting-notes
   datasource:
     # 실행 위치 기준 ./data/ 아래 파일 DB (data/는 .gitignore)
-    url: jdbc:h2:file:./data/trace-notes
+    # TRACE_LEVEL_FILE=0: H2가 SQL 오류와 실패한 값(본문)을 trace.db 파일에 남기지 않게 한다 (ADR 0005)
+    url: jdbc:h2:file:./data/trace-notes;TRACE_LEVEL_FILE=0
     username: sa
     password: ""
   jpa:
@@ -23,6 +24,11 @@ app:
   rate-limit:
     # SPEC F1: 미리보기 API IP당 분당 요청 수. 정리 요청 제한(S4)과 별도
     preview-per-minute: 60
+    # SPEC S4: 작업 생성 IP당 시간당 요청 수 (개발 프로필 200, application-dev.yml)
+    job-per-hour: 20
+  # SPEC S2: 작업·발언 보관 기간과 삭제 실행 간격
+  retention: 24h
+  retention-cleanup-interval: 10m
   # 프론트 주소만 허용한다. "*"는 쓰지 않는다.
   cors-allowed-origins:
     - http://localhost:5173

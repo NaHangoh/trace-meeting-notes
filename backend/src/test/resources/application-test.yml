@@ -1,3 +1,7 @@
 spring:
   datasource:
     url: jdbc:h2:mem:trace-notes-test;DB_CLOSE_DELAY=-1
+
+app:
+  # 스케줄 삭제가 테스트 도중 끼어들지 않게 한다. 테스트는 deleteExpired()를 직접 호출한다.
+  retention-cleanup-interval: 365d

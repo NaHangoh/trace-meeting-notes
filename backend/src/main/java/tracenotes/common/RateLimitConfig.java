@@ -12,21 +12,25 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * 미리보기 API 요청 수 제한. 바이트 상한 필터 뒤, 본문 파싱 전에 실행된다.
+ * 요청 수 제한: 미리보기(분당, SPEC F1)와 작업 생성(시간당, SPEC S4). 서로 다른 설정값과 제한기를 쓴다.
+ * 바이트 상한 필터 뒤, 본문 파싱 전에 실행된다.
  * IP는 getRemoteAddr만 쓴다. X-Forwarded-For 같은 헤더는 클라이언트가 바꿀 수 있다 (ADR 0006).
  */
 @Configuration
 public class RateLimitConfig implements WebMvcConfigurer {
 
     private final IpRateLimiter previewLimiter;
+    private final IpRateLimiter jobLimiter;
 
     public RateLimitConfig(RateLimitProperties properties, Clock clock) {
         this.previewLimiter = new IpRateLimiter(properties.previewPerMinute(), Duration.ofMinutes(1), clock);
+        this.jobLimiter = new IpRateLimiter(properties.jobPerHour(), Duration.ofHours(1), clock);
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new LimitInterceptor(previewLimiter)).addPathPatterns("/api/preview");
+        registry.addInterceptor(new LimitInterceptor(jobLimiter)).addPathPatterns("/api/jobs");
     }
 
     /** POST만 센다. CORS 사전 요청(OPTIONS)은 세지 않는다. */

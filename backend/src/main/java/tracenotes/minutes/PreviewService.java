@@ -2,26 +2,19 @@ package tracenotes.minutes;
 
 import java.util.List;
 import org.springframework.stereotype.Service;
-import tracenotes.common.AppProperties;
-import tracenotes.minutes.InvalidScriptException.Reason;
 
 /** 미리보기 (SPEC F1). 검사·분할만 하고 저장하지 않으며 본문을 로그에 남기지 않는다. */
 @Service
 public class PreviewService {
 
-    private final ScriptValidator validator;
-    private final ScriptSplitter splitter = new ScriptSplitter();
+    private final ScriptParser parser;
 
-    public PreviewService(AppProperties properties) {
-        this.validator = new ScriptValidator(properties.maxScriptChars());
+    public PreviewService(ScriptParser parser) {
+        this.parser = parser;
     }
 
     public Preview preview(String script) {
-        validator.validate(script);
-        List<Utterance> utterances = splitter.split(script);
-        if (utterances.isEmpty()) {
-            throw new InvalidScriptException(Reason.NO_UTTERANCES);
-        }
+        List<Utterance> utterances = parser.parse(script);
         return new Preview(utterances.size(), ScriptSplitter.speakersOf(utterances));
     }
 

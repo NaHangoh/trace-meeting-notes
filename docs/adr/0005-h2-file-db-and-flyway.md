@@ -18,3 +18,7 @@
 ## 결과
 - 얻는 것: 설치 없이 실행할 수 있고 테스트가 빠르다. PostgreSQL로 옮길 경로가 열려 있다.
 - 감수하는 것: H2와 PostgreSQL의 세부 동작 차이(타입, 대소문자, 시간대)를 배포 전에 다시 확인해야 한다. PostgreSQL로 옮길 때는 `flyway-database-postgresql` 모듈을 추가한다.
+
+## 변경 (2026-10-08): 발언 길이 단위와 H2 추적 파일
+- `job_utterance.content`를 `VARCHAR(2000000)`으로 늘렸다 (V2 마이그레이션). 글자 수 상한은 코드 포인트로 세지만 H2의 VARCHAR 길이는 UTF-16 단위라, 보충 평면 문자(이모지 등)가 많은 한 줄은 검사를 통과하고도 저장에서 500이 났다. 설정 상한(1,000,000자)을 모두 보충 평면 문자로 채워도 들어가는 길이로 정했다. CLOB(PostgreSQL에 없음)이나 VARCHAR(100000)(설정 상한을 올리면 다시 500) 대신 이 길이를 골랐다. `ALTER COLUMN ... SET DATA TYPE`과 이 길이는 PostgreSQL에서도 쓸 수 있다.
+- 파일 DB URL에 `TRACE_LEVEL_FILE=0`을 둔다. H2는 기본 설정에서 SQL 오류와 실패한 값(곧 회의 스크립트 본문)을 `trace.db` 파일에 남기고, 이 파일은 보관 기간 삭제 대상이 아니다.

@@ -1,0 +1,4 @@
+app:
+  rate-limit:
+    # SPEC S4: 개발 프로필의 작업 생성 IP당 시간당 요청 수
+    job-per-hour: 200

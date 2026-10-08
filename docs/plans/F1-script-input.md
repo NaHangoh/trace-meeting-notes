@@ -65,10 +65,15 @@
 - 설정값 검증(AppProperties): invalidLimitsFailStartup(매개변수화) — maxScriptChars는 1~1,000,000, maxRequestBytes는 1~10,485,760(10MB)을 벗어나면(0·음수·초과) 시작 실패
 - 설정값 검증(AppProperties): limitsAreConsistent — maxRequestBytes가 maxScriptChars × 4 + 여유분(JSON 감싸는 부분)보다 작으면 시작 실패. 기본값 50,000자·204,800바이트는 통과해야 한다. 여유분 값은 구현 때 정해 보고한다
 
-### W5. IpRateLimiter와 미리보기 제한
+### W5. IpRateLimiter와 미리보기 제한 ✅ 완료 (1ea46ae)
 - common: IpRateLimiter, ClockConfig(시계 Bean)
 - 테스트: 61stRequestInSameMinuteReturns429, resetsAfterWindow(시계 주입), separateLimitPerIp, previewAndJobLimitsAreIndependent
 - ADR 0006 작성
+- 결과: IpRateLimiter(고정 창, 지난 창 항목 삭제, 카운터 창은 뒤로 가지 않음), RateLimitProperties(`app.rate-limit.preview-per-minute`), RateLimitConfig(`/api/preview` POST 인터셉터, OPTIONS 제외), ApiError TOO_MANY_REQUESTS, ADR 0006. 전체 110개 통과
+- 테스트 이름: Java 메서드 이름은 숫자로 시작할 수 없어 `request61InSameMinuteReturns429`로 씀. previewAndJobLimitsAreIndependent는 제한기 수준(HTTP 수준은 W6 jobLimitUsesSeparateConfig)
+- 추가 테스트: windowsAreAlignedToWindowLength, staleEntriesAreRemovedAfterWindow, lateRequestFromOlderWindowDoesNotResetNewerCounter, concurrentRequestsAllowExactlyLimit, forwardedForHeaderIsIgnored, preflightIsNotCounted, previewLimitFollowsConfig
+- reviewer 반영: HTTP 테스트에 고정 시계(실제 시계로는 정각 분에 초기화되어 가끔 실패), 창 경계 경쟁 상태(늦게 온 앞 창 요청이 다음 창 카운터를 초기화) 수정, 설정값 연결·동시성 테스트 추가
+- W6: 작업 생성 제한 설정은 RateLimitProperties에 추가하고, HTTP 테스트는 고정 시계(PreviewRateLimitTest.FixedClockConfig 방식)를 쓴다
 
 ### W6. 작업 생성, 작업 생성 요청 수 제한, 보관 기간 삭제
 - JobController, JobService, Job, JobUtterance, 저장소, RetentionCleanupJob
@@ -95,7 +100,9 @@
 - /docs-sync F1 실행 (README, ARCHITECTURE, SPEC 체크박스를 코드·테스트에 맞춤)
 - 배포 시 CORS 주소를 프로필·환경 변수로 지정 (기본값 http://localhost:5173은 개발용)
 
-### 배포 시 점검 (CORS 설정을 잘못 쓴 경우, 시작 검증으로 잡히지 않음)
+### 배포 시 점검
+
+#### CORS (설정을 잘못 써도 시작 검증으로 잡히지 않는 경우)
 - 오타·잘못된 포트·http/https 혼동: 실제 프론트가 막히는데 시작은 정상으로 된다
 - 출처 형식이 아닌 값(`localhost:5173`, `http://host/path`): 아무것과도 일치하지 않아 실수를 알아채기 어렵다
 - 운영 설정에 http 주소나 공유·제3자 도메인(호스팅 하위 도메인 등)이 남지 않았는지
@@ -103,8 +110,13 @@
 - 비ASCII·punycode로 만든 비슷한 도메인, 값 안의 제어 문자
 - `app.cors-allowed-origins=`처럼 빈 값: 빈 목록(허용 없음)이 되거나 시작 실패
 - 환경 변수 `APP_CORS_ALLOWED_ORIGINS`나 프로필별 yml이 기대한 값을 덮어쓰지 않았는지
+
+#### 요청 수 제한
 - 신뢰 프록시 설정과 X-Forwarded-For 처리 (ADR 0006)
 - IPv6는 주소 대신 /64 대역 단위로 세는 방식 검토 (ADR 0006)
+
+#### 기타
+- H2와 PostgreSQL의 세부 동작 차이(타입, 대소문자, 시간대) 확인, PostgreSQL로 옮길 때 `flyway-database-postgresql` 추가 (ADR 0005)
 
 - 클라우드 리뷰 1회 (명령 이름은 그때 확인. 분할 규칙, 요청 수 제한, 보관 기간 삭제 집중)
 - F2 계획 시 로컬 LLM 실행기 결정: OpenAI 호환 로컬 클라이언트 하나로 llama.cpp(Vulkan)와 Ollama를 설정으로 바꿔 끼우고 eval로 속도·근거 탐지율 비교 (ADR 0002 갱신)
