@@ -162,6 +162,19 @@ class JobControllerTest {
         assertThat(count("job")).isEqualTo(jobsBefore);
     }
 
+    /** SPEC F1: 50,000자를 넘는 작업 생성 요청은 400이고, 오류 응답에 입력 본문을 넣지 않는다. */
+    @Test
+    void createJobOverLengthErrorDoesNotEchoInput() throws Exception {
+        MvcResult result = mvc.perform(job(MARKER + "가".repeat(50_000)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TOO_LONG"))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
+                .doesNotContain(MARKER)
+                .doesNotContain("가가가");
+    }
+
     @Test
     void createJobRejectsNoUtterances() throws Exception {
         int jobsBefore = count("job");
