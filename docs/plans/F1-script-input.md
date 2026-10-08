@@ -56,7 +56,10 @@
 - reviewer 반영: 405 응답의 Allow 헤더 유지
 - 후속(W3 커밋 뒤): CORS 허용 주소에 `*`가 있으면 시작 실패(AppProperties), 테스트 AppPropertiesTest(corsWildcardFailsStartup, explicitOriginsStartNormally). 3MB 테스트는 필터를 끄면 실패함을 확인
 
-### W4. 미리보기 API
+### W4. 미리보기 API ✅ 완료 (ff46260)
+- 결과: `POST /api/preview` (`{"text"}` → `{utteranceCount, speakers}`), PreviewService, AppProperties 범위·일관성 검증(JSON 여유분 1,024바이트), JsonConfig(서버 JSON 변환기 교체), 테스트 PreviewControllerTest 8 · AppPropertiesTest 추가분 · JsonConfigTest 2, 전체 97개 통과
+- reviewer 반영: 요청·응답 toString에 본문·화자 이름 제외, 깨진 JSON의 Jackson 오류 메시지가 DEBUG 로그에 남지 않게 공통 변환기(사용자 결정), 변환기를 빈이 아닌 서버 커스터마이저로 JSON 자리만 교체
+- 알려진 한계: 바이트 상한 일관성 검사는 JSON 이스케이프로 늘어나는 바이트(`\r\n`, 제어 문자)를 넣지 않음
 - PreviewController: `{ utteranceCount, speakers }`만 반환, 저장·본문 로그 없음
 - 테스트: returnsCountAndSpeakersOnly, blankReturns400, overLengthReturns400, nulReturns400, noUtterancesReturns400, doesNotPersistAnything, doesNotLogInputBody
 - 설정값 검증(AppProperties): invalidLimitsFailStartup(매개변수화) — maxScriptChars는 1~1,000,000, maxRequestBytes는 1~10,485,760(10MB)을 벗어나면(0·음수·초과) 시작 실패

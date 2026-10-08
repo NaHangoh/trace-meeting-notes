@@ -5,7 +5,7 @@
                          ├─ minutes  : 입력 분할(발언 번호), 작업 관리(비동기), 결과 저장
                          ├─ llm      : LlmClient ← Ollama / Claude / Fixture
                          ├─ evidence : 근거 위치 검증(코드), 검증 단계 호출, 판정 합치기
-                         └─ export   : docx 생성 (2차: hwp, xlsx)
+                         └─ export   : docx 생성
                       [DB] 작업·결과 저장
 ```
 
