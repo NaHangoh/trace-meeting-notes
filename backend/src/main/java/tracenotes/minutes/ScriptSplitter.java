@@ -76,7 +76,11 @@ public class ScriptSplitter {
         if (prefix.codePoints().noneMatch(Character::isLetter)) {
             return null;
         }
-        if (words.stream().anyMatch(HeaderWords.WORDS::contains)) {
+        if (words.stream().anyMatch(HeaderWords::isWord) || HeaderWords.isWholePrefix(prefix)) {
+            return null;
+        }
+        // (d) 콜론 바로 뒤가 "//"이면 URL로 시작하는 줄이다
+        if (line.startsWith("//", colon + 1)) {
             return null;
         }
         return prefix;
