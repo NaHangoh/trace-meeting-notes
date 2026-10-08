@@ -4,7 +4,7 @@
 AI 개발 환경 전체 설명: docs/AI-ENV.md · 위협과 한계: docs/THREAT-MODEL.md
 
 ## 구조
-- `backend/` Spring Boot 4.1 (Java 21, Gradle 툴체인), Spring AI는 F2에서 추가
+- `backend/` Spring Boot 4.1 (Java 21, Gradle 툴체인). LLM은 Spring AI 없이 OpenAI 호환 API를 직접 호출 (ADR 0001·0002)
 - `frontend/` React, TypeScript, Vite, Tailwind, PWA
 - `prompts/` 제품 프롬프트 (버전 관리)
 - `eval/` 가상 회의 데이터와 근거 검증 정확도 측정

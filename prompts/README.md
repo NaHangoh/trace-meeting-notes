@@ -6,5 +6,6 @@
 
 | 파일 | 단계 | 상태 |
 |---|---|---|
-| summarize.v1.md | 정리 | 초안 |
+| summarize.v1.md | 정리 | 실행·eval한 적 없는 초안, v2로 대체 (출력 스키마가 SPEC F2와 다름) |
+| summarize.v2.md | 정리 | F2에서 작성 예정, 첫 기준선 |
 | verify.v1.md | 검증 | 초안 |

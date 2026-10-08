@@ -26,7 +26,7 @@
 | 백엔드 | Java 21 (Gradle 툴체인), Gradle 9.8.0, Spring Boot 4.1.1, H2(파일 DB) + Flyway (버전은 Spring Boot BOM 관리) |
 | 프론트엔드 | Node 22.22.2 이상, React 19.3.0, TypeScript 5.9.3, Vite 8.3.3, Tailwind CSS 4.3.3, TanStack Query 5.104.1 |
 | 테스트 | JUnit 5 (Spring Boot Test), Vitest 5.0.3, Testing Library |
-| 예정 | Spring AI (F2), PWA |
+| 예정 | 로컬 LLM 연동 (F2, OpenAI 호환 API 직접 호출, llama.cpp llama-server), PWA |
 
 ## 실행 방법 (Windows PowerShell)
 
@@ -44,6 +44,15 @@ cd frontend
 npm ci
 npm run dev
 ```
+
+로컬 LLM 실행기 (F2, 예정 — 노트북 실측 전 초안)
+```powershell
+# llama.cpp Vulkan 빌드의 llama-server. 127.0.0.1에서만 열고 API 키를 쓴다.
+# 키는 .env의 LLM_API_KEY 값을 이 셸의 환경 변수로 넣어 둔다.
+llama-server -m <모델 GGUF 경로> --host 127.0.0.1 --port 8081 --api-key $env:LLM_API_KEY -c 16384 -ngl 99 --jinja
+```
+- `-c 16384`(컨텍스트 크기): 덩어리 최대 6,000자 + 정리 지시 + 출력 여유를 담기 위한 시작값이다. 덩어리 크기와 함께 eval과 노트북 실측으로 조정한다.
+- 모델: 기본 Qwen3-8B Q4_K_M, 비교 Kanana 1.5 8B (docs/SPEC.md F2 "모델")
 
 테스트
 ```powershell

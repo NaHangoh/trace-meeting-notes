@@ -31,3 +31,8 @@ Spring Boot 4.1 + Java 21 (Gradle 툴체인). Spring AI는 F2에서 Boot 4에 �
 
 ## 변경 (2026-10-08)
 - HWP 내보내기를 범위 밖으로 변경(2026-10-08), HWP 라이브러리 선택 이유는 해당 없음
+
+## 변경 (2026-10-08): Spring AI를 쓰지 않음
+- F2에서 Spring AI를 추가하지 않는다. LLM은 JDK HttpClient 또는 Spring `RestClient`로 OpenAI 호환 `/v1/chat/completions`를 직접 부른다 (ADR 0002 변경).
+- 이유: 쓰는 엔드포인트가 하나뿐이라 새 의존성을 들일 필요가 없다. 요청 본문(`tools`가 없는지, `response_format`이 있는지)을 테스트에서 그대로 확인할 수 있다.
+- 위 "결정"과 "변경 (2026-10-07)"의 Spring AI 관련 문장(F2에서 추가, Boot 4를 고른 이유 2)은 당시 계획으로 남겨 둔다. Boot 4 선택의 다른 이유(3.5 지원 종료)는 그대로다.
