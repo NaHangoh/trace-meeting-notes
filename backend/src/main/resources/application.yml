@@ -42,6 +42,9 @@ app:
     connect-timeout: 10s
     # Qwen3 생각 모드 끄기 (chat_template_kwargs.enable_thinking=false). Kanana는 false
     disable-thinking: true
+  # SPEC F2: 정리 프롬프트 버전 (prompts/summarize.{버전}.md). 바꾸기 전에 /eval로 비교한다
+  summary:
+    prompt-version: v2
   # 프론트 주소만 허용한다. "*"는 쓰지 않는다.
   cors-allowed-origins:
     - http://localhost:5173

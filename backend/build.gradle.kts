@@ -35,6 +35,15 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// 제품 프롬프트는 저장소 루트의 prompts/에서 관리하고(rules/llm.md), 빌드 때 classpath의 prompts/로 복사한다
+tasks.processResources {
+    from("../prompts") {
+        include("*.md")
+        exclude("README.md")
+        into("prompts")
+    }
+}
+
 tasks.test {
     useJUnitPlatform {
         // 실제 LLM이 필요한 테스트는 기본 실행에서 제외한다
