@@ -94,12 +94,16 @@
 - 인코딩: TextDecoder('utf-8', {fatal:true}) → 실패 시 TextDecoder('euc-kr', {fatal:true}) → 둘 다 실패 시 "읽을 수 없는 인코딩"
 - NUL 검사는 디코딩 전 바이트 단계
 - 테스트: decodesUtf8, stripsUtf8Bom, decodesCp949SameAsUtf8, rejectsUndecodableBytes, rejectsNonTxt, rejectsOver200Kb, rejectsNulBytes
+- 알려진 한계
+  - 테스트 환경(Node ICU)의 euc-kr 디코더는 CP949 확장 한글(똠·뷁 등)을 읽지 못해 자동 테스트로 확인할 수 없다. 브라우저의 euc-kr(windows-949)은 읽는다 → W8 브라우저 수동 확인
+  - UTF-8을 먼저 시도하므로, 파일 전체가 UTF-8로도 해석되는 CP949 글자(징·짜·책 등 217자)와 ASCII로만 된 짧은 파일은 깨진 글자(예: 책 → å)로 읽힌다. 다른 한글이 한 글자라도 있으면 euc-kr로 넘어간다. W8에서 읽은 내용이 입력란에 보이므로 사용자가 깨진 글자를 알아챌 수 있다
 
 ### W8. 입력 화면 (프론트)
 - ScriptInputPage.tsx, usePreview.ts(React Query, 500ms 디바운스), api/client.ts
 - 테스트: startDisabledWithGuidanceWhenBlank, callsPreviewOnceAfter500msIdle, showsSummaryLine, overLimitShowsCountAndBlocksStart, filePickFillsTextarea, fileErrorShowsReason, jobCreation429ShowsRetryMessage
 - 미리보기 API가 400·429를 돌려주면 요약 줄을 숨긴다
 - 빈 입력 최종 판정은 미리보기 응답 기준이다 (프론트 trim()과 서버 공백 기준이 다를 수 있음)
+- 브라우저 수동 확인: CP949 확장 한글(똠·뷁 등)이 든 .txt 파일이 입력란에 바르게 채워지는지 (W7 한계, 자동 테스트 불가)
 
 ## F1 완료 후
 - /docs-sync F1 실행 (README, ARCHITECTURE, SPEC 체크박스를 코드·테스트에 맞춤)
