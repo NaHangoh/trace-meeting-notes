@@ -20,6 +20,9 @@ app:
   max-script-chars: 50000
   # SPEC S3: 요청 본문 바이트 상한 200KB (200 × 1024)
   max-request-bytes: 204800
+  rate-limit:
+    # SPEC F1: 미리보기 API IP당 분당 요청 수. 정리 요청 제한(S4)과 별도
+    preview-per-minute: 60
   # 프론트 주소만 허용한다. "*"는 쓰지 않는다.
   cors-allowed-origins:
     - http://localhost:5173
