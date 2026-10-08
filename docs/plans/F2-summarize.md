@@ -25,15 +25,25 @@
 
 ## 작업 단위
 
-### W1. LLM 설정과 클라이언트
+### W1. LLM 설정과 클라이언트 ✅ 완료 (6b7769f)
 - llm 패키지: `LlmProperties`(provider, base-url, model, api-key는 `LLM_API_KEY`, timeout 5분, disable-thinking), `LlmClient`, `OpenAiCompatibleLlmClient`, `FixtureLlmClient`, 호출 결과·실패 종류(형식 오류는 W4에서 판정, 여기서는 `TIMEOUT`, `CONNECTION_REFUSED`, 그 밖의 HTTP 오류)
 - 테스트(가짜 HTTP 서버): requestHasResponseFormatAndNoTools, requestHasChatTemplateKwargsWhenThinkingDisabled, apiKeyOnlyInAuthorizationHeader, apiKeyNotInErrorsOrLogs, timeoutIsTimeoutFailure, connectionRefusedIsConnectionFailure, missingApiKeyFailsStartupWithKeyNameOnly(값은 메시지에 넣지 않음)
 - 끝에 `@Tag("llm")` 확인: llama-server가 `response_format`과 `chat_template_kwargs`를 받는지 (사용자가 실행기를 띄운 상태에서, 호출 수 1회 사전 확인)
+- 결과: 위 테스트 외에 연결 타임아웃 10초(`app.llm.connect-timeout`)·분류, base-url http(s) 검사·끝 슬래시, 5xx·content null·응답 도중 끊김, 키 제어 문자 시작 차단, 시작 실패 출력(FailureAnalyzer 포함)에 키 없음, fixture WARN, 루트 `.env` 읽기(`spring.config.import`, 테스트 프로필 제외)와 `APP_LLM_*` 참조, Gradle `test`에서 fixture 고정·LLM 환경 변수 제거, `llmTest` 작업. 백엔드 193개 통과
+- `@Tag("llm")` 실제 확인(2026-10-08, Qwen3-8B Q4_K_M, llama-server `-c 16384 -np 1`): 1차 thinkTagAbsent·schemaValid, 항목 4개, 14.6초 / 2차 reasoningEmpty까지 확인, 항목 5개, 12.3초. 응답 본문은 보지 않음
+- 실패 대응 결정(사용자): `HTTP_ERROR` → `LLM_ERROR`(재시도 없음, 로그는 상태 코드만), `MALFORMED_RESPONSE` → `INVALID_OUTPUT`(최대 2회). SPEC F2 반영
+- reviewer 반영: 키 제어 문자 시 JDK 예외로 키 노출(중간), 셸 환경 변수가 테스트의 fixture를 덮어씀(높음), 시작 실패 출력 테스트의 환경 의존(중간)
+- W6으로 미룸: `InterruptedException`을 `TIMEOUT`으로 분류하는 문제(재시작 처리와 함께)
 
-### W2. 정리 프롬프트 v2
+### W2. 정리 프롬프트 v2 ✅ 완료 (8b9425c)
 - `/prompt`로 `prompts/summarize.v2.md` 작성 → prompt-reviewer. 출력은 SPEC F2 스키마
 - 프롬프트 로더와 메시지 조립: 지시는 시스템 메시지, 발언은 `[번호] 화자: 내용` 형식으로 요청마다 무작위 구분자 블록 안에
 - 테스트: utterancesOnlyInsideDelimiter, contentCannotCloseDelimiter(발언에 구분자와 같은 문자열이 있어도 블록이 닫히지 않음), injectionTextStaysAsData, promptVersionFromConfig
+- 결과: summary 패키지(SummaryPromptBuilder: 구분자 `SCRIPT_` + 16자리 16진수 SecureRandom, 발언과 겹치면 다시 뽑기, 줄 구분 문자 `\R`은 공백으로, response_format 스키마 / PromptLoader: classpath `prompts/summarize.vN.md`, 버전은 v숫자만, 앞쪽 주석 제거 / SummaryProperties `app.summary.prompt-version` 기본 v2), LlmRequest null 검사, Gradle processResources로 `prompts/*.md` 복사. 백엔드 218개 통과
+- 추가 테스트: delimiterDiffersPerRequest, lineBreaksInsideContentAreFlattened, otherLineSeparatorsCannotCreateFakeUtteranceLines(\r·U+2028·U+2029·U+0085), realPromptDescribesTheBlockTheBuilderMakes, schemaMatchesSpec(maxItems·maxLength 포함), templateWithoutDelimiterPlaceholderIsRejected, PromptLoaderTest 3종, SummaryConfigTest 3종, LlmRequestTest
+- prompt-reviewer 반영: 담당자·기한 발언을 TODO 근거에 포함, 본인이 맡으면 화자 이름, 담당자 여럿이면 TODO 분리, DECISION·TODO·AGENDA 경계, 내용 속 가짜 `[번호]`, 화자 이름 위장, 형식 요구는 결정·할 일 아님, null 표기
+- 결정(사용자): 근거 최소 개수(minItems) 강제 안 함, 이유는 SPEC F2에 기록
+- W4에서 이어갈 것: 빌더를 클라이언트까지 거친 요청 본문 확인(SPEC 수용 기준 "response_format 있음·tools 없음·발언은 구분자 블록 안에만")
 
 ### W3. 응답 검증
 - `SummaryValidator`: JSON 파싱, 스키마 밖 필드 버림, `text` 500자 초과·알 수 없는 `type` 항목 버림, 덩어리당 100개 초과 버림, `assignee`·`due`는 TODO에만
