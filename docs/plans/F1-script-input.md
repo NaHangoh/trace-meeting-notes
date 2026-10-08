@@ -101,12 +101,18 @@
 - 추가 테스트: acceptsUppercaseTxtExtension(SPEC에 대소문자 무시 추가, 사용자 결정), acceptsExactly200Kb, rejectsUtf16FileAsContainingNul, checksExtensionBeforeSize, checksSizeBeforeReadingContent, limitsMatchServer
 - reviewer: 정확성 문제 없음. 낮음 3건 중 한계 2건은 기록, 검사 순서 테스트 2개 추가(순서를 뒤집으면 실패 확인)
 
-### W8. 입력 화면 (프론트)
+### W8. 입력 화면 (프론트) ✅ 완료 (76d18a4)
 - ScriptInputPage.tsx, usePreview.ts(React Query, 500ms 디바운스), api/client.ts
 - 테스트: startDisabledWithGuidanceWhenBlank, callsPreviewOnceAfter500msIdle, showsSummaryLine, overLimitShowsCountAndBlocksStart, filePickFillsTextarea, fileErrorShowsReason, jobCreation429ShowsRetryMessage
 - 미리보기 API가 400·429를 돌려주면 요약 줄을 숨긴다
 - 빈 입력 최종 판정은 미리보기 응답 기준이다 (프론트 trim()과 서버 공백 기준이 다를 수 있음)
 - 브라우저 수동 확인: CP949 확장 한글(똠·뷁 등)이 든 .txt 파일이 입력란에 바르게 채워지는지 (W7 한계, 자동 테스트 불가)
+- 결과: api/client.ts(상대 경로 /api, 알려진 오류 코드만 받고 응답 본문 문구는 쓰지 않음, 응답 형식 검사), messages.ts(코드별 고정 문구), scriptLength.ts(CRLF→LF 후 코드 포인트), ScriptInputPage(일반 텍스트 렌더링, 작업 ID는 화면에 쓰지 않음). 새 의존성 없음
+- 추가 테스트: startDisabledWhenPreviewSaysBlankOrNoUtterances, rendersSpeakerNamesAsPlainText, previewErrorHidesSummaryLine, countsLikeServer, jobCreationErrorShowsFixedMessageNotResponseBody, jobCreationSuccessShowsStatus, jobCreationSuccessBlocksRestartWithSameInput, inputIsLockedWhileJobIsPending, rapidDoubleClickCreatesOneJob, lastPickedFileWins, fileReadFailureShowsFixedMessage, editingTextClearsFileError, lateResponseForOlderInputIsIgnored, nbspOrIdeographicSpaceOnlyIsBlank
+- 테스트 방식: vitest 가짜 타이머(setTimeout·setInterval·Date만), 입력은 fireEvent (user-event는 Testing Library 비동기 래퍼의 setTimeout(0) 대기 때문에 가짜 타이머에서 멈춤), cleanup 직접 호출
+- 결정(사용자 확인): 작업 생성 성공 뒤에는 입력을 바꿔야 다시 시작할 수 있다 (같은 입력으로 작업이 두 번 생기지 않게). 요청 중에는 입력란 읽기 전용, 파일 열기 꺼짐
+- reviewer 반영: 작업 중복 생성(성공 뒤 재클릭, 요청 중 입력 변경, 연속 클릭), 후속 커밋에서 낮음 1·2·3(마지막 고른 파일만 반영, 읽기 실패 고정 문구, 입력이 바뀌면 파일 오류 안내 지움)과 테스트 5·6(늦게 온 응답 무시, NBSP·전각 공백만 있는 입력)
+- 알려진 한계: 미리보기 결과 전에는 버튼이 켜져 있다. 이때 시작하면 서버가 400으로 막고 고정 문구로 안내한다. 결과를 기다리게 하면 매번 지연이 생겨 이렇게 둠
 
 ## F1 완료 후
 - /docs-sync F1 실행 (README, ARCHITECTURE, SPEC 체크박스를 코드·테스트에 맞춤)

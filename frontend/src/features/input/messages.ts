@@ -7,6 +7,9 @@ export const BLANK_GUIDANCE = '스크립트를 붙여 넣거나 txt 파일을 �
 
 export const JOB_CREATED = '작업을 만들었습니다.'
 
+/** 고른 파일의 내용을 읽지 못함 (고른 뒤 파일이 지워짐 등). */
+export const FILE_READ_FAILED = '파일을 읽지 못했습니다. 다시 열어 보세요.'
+
 export function fileErrorMessage(reason: ReadFailure): string {
   switch (reason) {
     case 'NOT_TXT':

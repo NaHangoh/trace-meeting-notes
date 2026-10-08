@@ -8,7 +8,8 @@ import { ScriptInputPage } from './ScriptInputPage'
 // 입력은 fireEvent로 넣는다. user-event는 Testing Library의 비동기 래퍼가 setTimeout(0)을 기다리는데,
 // vitest 가짜 타이머에서는 그 타이머가 돌지 않아 멈춘다.
 
-type Reply = { status: number; body: unknown }
+/** gate를 주면 그 약속이 풀릴 때까지 응답이 늦어진다 (늦게 온 응답 확인용). */
+type Reply = { status: number; body: unknown; gate?: Promise<void> }
 
 const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>()
 let previewReplies: Reply[] = []
@@ -64,6 +65,30 @@ function pickFile(file: File) {
   fireEvent.change(fileInput(), { target: { files: [file] } })
 }
 
+/** 풀릴 때까지 기다리는 약속과 그것을 푸는 함수. */
+function deferred<T = void>() {
+  let resolve: (value: T) => void = () => {}
+  let reject: (reason: unknown) => void = () => {}
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+/** 내용 읽기(arrayBuffer)를 테스트가 정한 시점에 끝내는 txt 파일. */
+function controlledFile(content: string) {
+  const file = new File([content], 'meeting.txt', { type: 'text/plain' })
+  const read = deferred<ArrayBuffer>()
+  Object.defineProperty(file, 'arrayBuffer', { value: () => read.promise })
+  const bytes = new TextEncoder().encode(content)
+  return {
+    file,
+    finish: () => read.resolve(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+    fail: () => read.reject(new DOMException('NotReadableError')),
+  }
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
   previewReplies = []
@@ -76,6 +101,9 @@ beforeEach(() => {
     }
     const queue = url === '/api/preview' ? previewReplies : jobReplies
     const reply = queue.shift() ?? { status: 500, body: { code: 'INTERNAL_ERROR' } }
+    if (reply.gate) {
+      await reply.gate
+    }
     return respond(reply)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -342,6 +370,80 @@ describe('ScriptInputPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent('작업을 만들었습니다.')
     expect(textarea()).not.toHaveAttribute('readonly')
     expect(jobCalls()).toHaveLength(1)
+  })
+
+  /** 파일을 연달아 고르면 마지막에 고른 파일만 입력란에 채운다 (먼저 고른 파일이 늦게 읽혀도). */
+  it('lastPickedFileWins', async () => {
+    renderPage()
+    const first = controlledFile('김민수: 첫 파일')
+    const second = controlledFile('이영희: 두 번째 파일')
+
+    pickFile(first.file)
+    pickFile(second.file)
+    second.finish()
+    await advance(0)
+    first.finish()
+    await advance(0)
+
+    expect(textarea()).toHaveValue('이영희: 두 번째 파일')
+  })
+
+  /** 파일 내용을 읽지 못하면(고른 뒤 파일이 지워짐 등) 고정 문구로 안내하고 입력란은 그대로 둔다. */
+  it('fileReadFailureShowsFixedMessage', async () => {
+    renderPage()
+    typeText('기존 입력')
+    const broken = controlledFile('김민수: 가')
+
+    pickFile(broken.file)
+    broken.fail()
+    await advance(0)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('파일을 읽지 못했습니다. 다시 열어 보세요.')
+    expect(textarea()).toHaveValue('기존 입력')
+  })
+
+  it('editingTextClearsFileError', async () => {
+    renderPage()
+
+    pickFile(new File(['가'], 'meeting.docx'))
+    await advance(0)
+    expect(screen.getByRole('alert')).toHaveTextContent('txt 파일만 열 수 있습니다.')
+
+    typeText('김민수: 직접 입력')
+
+    expect(screen.queryByText(/txt 파일만 열 수 있습니다/)).not.toBeInTheDocument()
+  })
+
+  /** 앞 입력의 미리보기 응답이 늦게 와도 지금 입력의 요약으로 보이지 않는다. */
+  it('lateResponseForOlderInputIsIgnored', async () => {
+    const slow = deferred()
+    previewReplies.push({ status: 200, body: { utteranceCount: 9, speakers: ['옛화자'] }, gate: slow.promise })
+    previewReplies.push({ status: 200, body: { utteranceCount: 1, speakers: ['새화자'] } })
+    renderPage()
+
+    typeText('옛 입력')
+    await advance(500)
+    typeText('새 입력')
+    await advance(500)
+    slow.resolve()
+    await advance(0)
+
+    expect(screen.getByText('발언 1개 · 화자 1명 (새화자)')).toBeInTheDocument()
+    expect(screen.queryByText(/옛화자/)).not.toBeInTheDocument()
+  })
+
+  /** SPEC F1: NBSP나 전각 공백만 있는 입력도 공백만 있는 입력이다. */
+  it('nbspOrIdeographicSpaceOnlyIsBlank', async () => {
+    renderPage()
+
+    for (const code of [0x00a0, 0x3000]) {
+      typeText(String.fromCharCode(code).repeat(3) + '\n' + String.fromCharCode(code))
+      await advance(500)
+
+      expect(startButton()).toBeDisabled()
+      expect(screen.getByText('스크립트를 붙여 넣거나 txt 파일을 여세요.')).toBeInTheDocument()
+    }
+    expect(previewCalls()).toHaveLength(0)
   })
 
   /** 화면이 다시 그려지기 전의 연속 클릭도 요청 하나로 막는다. */

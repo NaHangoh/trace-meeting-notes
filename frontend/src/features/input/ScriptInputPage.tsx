@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useRef, useState, type ChangeEvent } from 'react'
 import { ApiError, createJob, type ApiErrorCode } from '../../api/client'
 import { MAX_SCRIPT_CHARS } from './limits'
-import { apiErrorMessage, BLANK_GUIDANCE, fileErrorMessage, JOB_CREATED } from './messages'
+import { apiErrorMessage, BLANK_GUIDANCE, FILE_READ_FAILED, fileErrorMessage, JOB_CREATED } from './messages'
 import { readScriptFile } from './readScriptFile'
 import { scriptLength } from './scriptLength'
 import { usePreview } from './usePreview'
@@ -29,6 +29,7 @@ function errorCodeOf(error: unknown): ApiErrorCode {
 export function ScriptInputPage() {
   const [text, setText] = useState('')
   const [fileError, setFileError] = useState<string | null>(null)
+  const lastPick = useRef(0)
 
   const length = scriptLength(text)
   const blank = text.trim() === ''
@@ -57,6 +58,7 @@ export function ScriptInputPage() {
       return
     }
     setText(next)
+    setFileError(null)
     job.reset()
   }
 
@@ -76,9 +78,20 @@ export function ScriptInputPage() {
     if (!file) {
       return
     }
-    const result = await readScriptFile(file)
-    if (result.ok) {
-      setFileError(null)
+    // 연달아 고르면 마지막에 고른 파일만 반영한다 (먼저 고른 파일이 늦게 읽혀도 덮어쓰지 않음)
+    const pick = ++lastPick.current
+    let result: Awaited<ReturnType<typeof readScriptFile>> | null
+    try {
+      result = await readScriptFile(file)
+    } catch {
+      result = null
+    }
+    if (pick !== lastPick.current) {
+      return
+    }
+    if (result === null) {
+      setFileError(FILE_READ_FAILED)
+    } else if (result.ok) {
       changeText(result.text)
     } else {
       setFileError(fileErrorMessage(result.reason))
