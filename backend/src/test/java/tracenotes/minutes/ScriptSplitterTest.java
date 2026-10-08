@@ -229,6 +229,28 @@ class ScriptSplitterTest {
         assertThat(ScriptSplitter.speakersOf(result)).containsExactly("이영희");
     }
 
+    /** (d)는 첫 콜론 바로 뒤만 본다. 화자 뒤에 URL이 오면 화자는 그대로이고 내용에 URL이 남는다. */
+    @Test
+    void urlAfterSpeakerKeepsSpeaker() {
+        List<Utterance> result = splitter.split("김민수: https://example.com 자료\n김민수:https://example.com");
+
+        assertThat(result).containsExactly(
+                new Utterance(1, "김민수", "https://example.com 자료"),
+                new Utterance(2, "김민수", "https://example.com"));
+    }
+
+    /** 전체 일치 비교 전 공백 합치기는 NBSP도 공백으로 본다. */
+    @Test
+    void nbspSeparatedWholePrefixHeaderIsNotSpeaker() {
+        String line = "할" + Character.toString(0x00A0) + "일: 보고서 작성";
+
+        List<Utterance> result = splitter.split("김민수: 공유합니다\n" + line);
+
+        assertThat(result).containsExactly(
+                new Utterance(1, "김민수", "공유합니다"),
+                new Utterance(2, "김민수", line));
+    }
+
     /** 콜론 뒤에 "/" 하나만 오는 것은 URL이 아니므로 기존 규칙대로 화자다. */
     @Test
     void singleSlashAfterColonIsSpeaker() {
