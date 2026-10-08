@@ -89,7 +89,7 @@
 - reviewer 반영: 보충 평면 문자 줄 저장 500(V2, 사용자 결정 VARCHAR(2000000)), H2 trace 파일 본문 기록(사용자 결정 TRACE_LEVEL_FILE=0, ADR 0005), created_at·트랜잭션 테스트, 테스트 중 스케줄 삭제 끼어듦
 - 재리뷰(낮음) 후속: 롤백 테스트에 job INSERT 실행 단언 추가, 배포 시 점검에 TRACE_LEVEL_FILE=0 유지 확인 추가. 1,000,000자 설정 저장 테스트는 넣지 않음(사용자 결정: 보충 평면 최대 길이 테스트로 충분, 요청 4MB라 느림)
 
-### W7. 파일 읽기 (프론트)
+### W7. 파일 읽기 (프론트) ✅ 완료 (cc382a2)
 - src/features/input/readScriptFile.ts, limits.ts
 - 인코딩: TextDecoder('utf-8', {fatal:true}) → 실패 시 TextDecoder('euc-kr', {fatal:true}) → 둘 다 실패 시 "읽을 수 없는 인코딩"
 - NUL 검사는 디코딩 전 바이트 단계
@@ -97,6 +97,9 @@
 - 알려진 한계
   - 테스트 환경(Node ICU)의 euc-kr 디코더는 CP949 확장 한글(똠·뷁 등)을 읽지 못해 자동 테스트로 확인할 수 없다. 브라우저의 euc-kr(windows-949)은 읽는다 → W8 브라우저 수동 확인
   - UTF-8을 먼저 시도하므로, 파일 전체가 UTF-8로도 해석되는 CP949 글자(징·짜·책 등 217자)와 ASCII로만 된 짧은 파일은 깨진 글자(예: 책 → å)로 읽힌다. 다른 한글이 한 글자라도 있으면 euc-kr로 넘어간다. W8에서 읽은 내용이 입력란에 보이므로 사용자가 깨진 글자를 알아챌 수 있다
+- 결과: readScriptFile(검사 순서 확장자 → 크기 → NUL → UTF-8 → euc-kr, 결과 `{ ok, text }` 또는 `{ ok: false, reason }`; 안내 문구는 W8), limits.ts(204,800바이트, 50,000자). 프론트 18개 통과, 타입 오류 0
+- 추가 테스트: acceptsUppercaseTxtExtension(SPEC에 대소문자 무시 추가, 사용자 결정), acceptsExactly200Kb, rejectsUtf16FileAsContainingNul, checksExtensionBeforeSize, checksSizeBeforeReadingContent, limitsMatchServer
+- reviewer: 정확성 문제 없음. 낮음 3건 중 한계 2건은 기록, 검사 순서 테스트 2개 추가(순서를 뒤집으면 실패 확인)
 
 ### W8. 입력 화면 (프론트)
 - ScriptInputPage.tsx, usePreview.ts(React Query, 500ms 디바운스), api/client.ts
