@@ -55,11 +55,13 @@
 - 결정(사용자, SPEC F2 반영): 담당자·기한은 공백 뺀 2자 이상만, 담당자는 근거 발언 화자 이름 전체 일치 또는 내용 부분 일치, 기한은 내용에서만. 근거 발언 안의 다른 사람 이름은 코드로 못 가려 F3·사람 확인에 맡김
 - reviewer 반영: 부분 일치가 느슨함(중간, 위 결정), 낮음 5건(큰 정수·3.0·null 근거, 상한 세는 방식, 값 쪽 공백 정규화, 근거 없는 TODO·객체 아닌 원소, text 앞뒤 공백을 Whitespace.strip으로)
 
-### W4. 덩어리 나누기와 정리 실행
+### W4. 덩어리 나누기와 정리 실행 ✅ 완료 (b79780d)
 - `ScriptChunker`(6,000자, 발언 경계, 넘는 발언은 잘라 같은 번호), `SummarizeService`(덩어리별 호출 → 검증 → 이어 붙이기, 형식 오류만 재시도 2회)
 - 로그: 재시도 횟수와 실패 사유 종류만 (본문·화자·작업 ID 없음)
 - 테스트: chunkBoundariesKeepUtteranceNumbers(덩어리 3개), oversizedUtteranceSplitKeepsNumber, invalidOutputRetriesTwiceThenFails(호출 3회), timeoutFailsWithoutRetry(호출 1회), connectionRefusedFailsWithoutRetry, resultsConcatenatedInChunkOrder, logsHaveOnlyRetryCountAndFailureKind
 - 완료 조건(W2에서 넘김): 빌더 → 실제 클라이언트를 거친 요청 본문을 가짜 HTTP 서버로 확인. `response_format` 있음, `tools`·`functions`·`tool_choice` 없음, 발언은 구분자 블록 안에만(시스템 메시지에 발언 없음). 덩어리마다 그 덩어리의 발언만 블록에 들어감
+- 결과: ScriptChunker(최소 100자, 넘는 발언은 코드 포인트 단위로 잘라 같은 번호·화자), SummarizeService(형식 오류만 덩어리마다 최대 2회, 실패 시 남은 덩어리 안 부름, 실패 종류 분기는 switch 식), SummaryFailure·SummaryFailedException, `app.summary.chunk-size` 기본 6000. SummarizeRequestBodyTest로 완료 조건 확인(요청별 발언 [1,2,3]/[4,5,6]). 백엔드 269개 통과
+- reviewer 반영: 잘린 발언 결과의 근거 번호 유지, LLM_ERROR 로그에 상태 코드만(중간 2건, 테스트 추가), 낮음 3건(switch 식, chunk-size 전달 테스트, 요청별 발언 확인). 요청 조립 예외 변환은 W6으로
 
 ### W5. 저장 (마이그레이션 V3)
 - `job`에 status·failure 열, `summary_item`(작업·순번·종류·내용·담당자·기한), `summary_evidence`(항목·발언 번호). 모두 FK CASCADE. 표준 SQL만 (ADR 0005)
@@ -70,6 +72,7 @@
 - 확장 경로(ADR 0007): 서버 여러 대는 DB 구현(`SELECT … FOR UPDATE SKIP LOCKED`)으로 교체, 요청 수 제한기는 Redis나 DB로
 - `POST /api/jobs/{id}/retry`: `FAILED`만(그 밖 409), 작업 생성과 같은 S4 제한기·대기열 상한
 - W4에서 넘김: 요청 조립(`SummaryPromptBuilder`)의 `IllegalStateException` 등 정리 중 예상 밖 예외를 작업 실패로 바꿀지 결정하고 처리 (지금은 `SummaryFailedException`으로 바뀌지 않음)
+- W5에서 넘김: `SummaryRepository.saveDone`이 DB 제약 위반 등으로 실패하면(롤백되어 `RUNNING`에 남음) `markFailed`로 작업 실패 처리
 - 테스트: workersFollowConfig, queuedRunningDoneLifecycle, queueFullReturns429QueueFullAndCreatesNoJob, concurrentCreationNeverExceedsQueueLimit, retryOnlyForFailed409Otherwise, retryCountsTowardJobLimit, retryRespectsQueueLimit, restartMarksQueuedAndRunningFailed, restartFailedJobCanRetry
 
 ### W7. 조회 API
@@ -89,6 +92,7 @@
 - llama-server가 `response_format`(JSON 스키마)과 `chat_template_kwargs`를 받는지: W1 끝 `@Tag("llm")`로 확인
 - Ollama의 OpenAI 호환 엔드포인트가 `response_format` JSON 스키마를 받는지: 비교할 때 확인, 안 되면 한계로 기록
 - 덩어리 6,000자와 `-c 16384`가 노트북에서 5분 안에 끝나는지: 실측으로 조정
+- 주의할 점(W4 security-checker): `SummarizeService`는 실행기 오류(`LLM_ERROR`) 때 `LlmCallException` 메시지를 WARN 로그에 남긴다. 지금은 상태 코드만 담은 고정 문구지만, `OpenAiCompatibleLlmClient` 예외 메시지를 바꿀 때(응답 본문 추가 등) 로그 노출을 다시 확인한다
 
 ## F2 완료 후
 - /docs-sync F2 (README 실행 명령 실측 반영, ARCHITECTURE에 llm 패키지와 정리 흐름 시퀀스)
