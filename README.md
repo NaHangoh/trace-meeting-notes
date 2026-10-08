@@ -37,6 +37,10 @@
 cd backend
 .\gradlew.bat bootRun
 ```
+- 백엔드는 시작할 때 LLM 실행기 키(`LLM_API_KEY`)가 필요하다. 없으면 시작하지 않는다.
+- 저장소 루트의 `.env`(`KEY=VALUE` 형식, `.env.example` 참고)를 `backend/`에서 실행할 때 자동으로 읽는다. 여기에 `LLM_API_KEY`를 넣어 둔다. 테스트는 `.env`를 읽지 않는다.
+- 셸 환경 변수로 넣어도 된다: `$env:LLM_API_KEY = "<키>"`
+- F1(입력 화면)만 쓸 때는 실행기 없이 `$env:APP_LLM_PROVIDER = "fixture"`로 시작한다. 이때 정리 결과는 실제 LLM 결과가 아니다(시작 로그에 WARN).
 
 프론트엔드 (`http://localhost:5173`, `/api` 요청은 Vite 프록시가 백엔드로 넘김)
 ```powershell
@@ -49,7 +53,7 @@ npm run dev
 ```powershell
 # llama.cpp Vulkan 빌드의 llama-server. 127.0.0.1에서만 열고 API 키를 쓴다.
 # 키는 .env의 LLM_API_KEY 값을 이 셸의 환경 변수로 넣어 둔다.
-llama-server -m <모델 GGUF 경로> --host 127.0.0.1 --port 8081 --api-key $env:LLM_API_KEY -c 16384 -ngl 99 --jinja
+llama-server -m <모델 GGUF 경로> --host 127.0.0.1 --port 8081 --api-key $env:LLM_API_KEY -c 16384 -np 1 -ngl 99 --jinja
 ```
 - `-c 16384`(컨텍스트 크기): 덩어리 최대 6,000자 + 정리 지시 + 출력 여유를 담기 위한 시작값이다. 덩어리 크기와 함께 eval과 노트북 실측으로 조정한다.
 - 모델: 기본 Qwen3-8B Q4_K_M, 비교 Kanana 1.5 8B (docs/SPEC.md F2 "모델")

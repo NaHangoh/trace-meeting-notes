@@ -127,12 +127,20 @@
 - API:
   - `GET /api/jobs/{id}` → `{status, failure?, items?}`. 발언 본문은 넣지 않는다. IP당 분당 120회(설정값), 넘으면 429 `TOO_MANY_REQUESTS`. 형식이 틀린 ID, 존재하지 않는 ID, 보관 기간이 지나 삭제된 ID는 모두 같은 404. 로그인이 없으므로 작업 ID를 아는 사람이 곧 열람 권한자다(S1).
   - `POST /api/jobs/{id}/retry` → 실패한 작업만 다시 실행. 그 밖의 상태는 409.
-- 상태: `QUEUED`, `RUNNING`, `DONE`, `FAILED`. 실패 사유: `INVALID_OUTPUT`, `TIMEOUT`, `CONNECTION_REFUSED`, `SERVER_RESTART`.
+- 상태: `QUEUED`, `RUNNING`, `DONE`, `FAILED`. 실패 사유: `INVALID_OUTPUT`, `TIMEOUT`, `CONNECTION_REFUSED`, `LLM_ERROR`, `SERVER_RESTART`.
 - 저장: 작업 상태·실패 사유와 결과 항목을 저장한다(마이그레이션). 결과도 보관 기간 삭제(S2) 대상이다.
 
 #### 실패 처리
-- 호출 하나당 타임아웃 5분(설정값).
+- 호출 하나당 타임아웃 5분(설정값). 실행기 연결 타임아웃 10초(설정값).
 - JSON·스키마 검증이 실패했을 때만 최대 2회 다시 부른다(총 3회). 타임아웃과 연결 거부는 다시 부르지 않고 바로 `FAILED`.
+- 호출 실패와 실패 사유의 대응:
+
+  | 호출 결과 | 실패 사유 | 다시 부름 |
+  |---|---|---|
+  | 응답 내용이 JSON·스키마에 맞지 않음, 응답이 OpenAI 형식이 아님(`choices`·`content` 없음) | `INVALID_OUTPUT` | 최대 2회 |
+  | 호출 타임아웃 | `TIMEOUT` | 안 함 |
+  | 연결 거부, 연결 타임아웃, 응답 도중 연결 끊김 | `CONNECTION_REFUSED` | 안 함 |
+  | 실행기가 2xx가 아닌 상태로 답함 (키 오류 401, 컨텍스트 초과 400, 모델 로딩 중 503 등) | `LLM_ERROR` | 안 함. 로그에는 HTTP 상태 코드만 남기고 응답 본문은 남기지 않는다 |
 - 실패 시 고정 문구와 "다시 시도" 버튼(같은 작업 재실행). 다시 시도도 작업 생성과 같은 요청 수 제한(S4)과 대기열 상한을 적용받는다.
 - 로그에는 재시도 횟수와 실패 사유 종류(형식 오류, 타임아웃, 연결 거부)만 남긴다. 본문, 화자 이름, 작업 ID는 남기지 않는다.
 
@@ -152,6 +160,7 @@
 - [ ] LLM 요청 본문에 `response_format`(JSON 스키마)이 있고, `tools`·`functions`는 없으며, 발언은 구분자 블록 안에만 있다(가짜 HTTP 서버로 확인).
 - [ ] JSON·스키마가 틀리면 최대 2회 다시 부르고(총 3회), 그래도 틀리면 `FAILED`(`INVALID_OUTPUT`)이다.
 - [ ] 타임아웃·연결 거부는 다시 부르지 않고(1회) 바로 `FAILED`다.
+- [ ] 실행기가 2xx가 아닌 상태로 답하면 다시 부르지 않고 `FAILED`(`LLM_ERROR`)이고, 로그에는 상태 코드만 있다. OpenAI 형식이 아닌 응답은 `INVALID_OUTPUT`과 같이 최대 2회 다시 부른다.
 - [ ] 다시 시도는 `FAILED` 작업만 되고(그 밖은 409), 같은 발언으로 다시 정리하며, S4 제한과 대기열 상한을 적용받는다.
 - [ ] 대기열이 10개를 넘으면 작업 생성은 429 `QUEUE_FULL`이고 작업이 생기지 않는다.
 - [ ] 서버를 다시 시작하면 `QUEUED`·`RUNNING` 작업은 `FAILED`(`SERVER_RESTART`)가 되고 다시 시도할 수 있다.

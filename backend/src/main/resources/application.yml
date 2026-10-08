@@ -29,6 +29,28 @@ app:
   # SPEC S2: 작업·발언 보관 기간과 삭제 실행 간격
   retention: 24h
   retention-cleanup-interval: 10m
+  # SPEC F2: LLM 호출 (ADR 0002). 키는 환경 변수 LLM_API_KEY로만 넣는다
+  llm:
+    # .env와 셸 환경 변수 둘 다 적용되도록 APP_LLM_* 이름으로 참조하고 기본값을 둔다
+    provider: ${APP_LLM_PROVIDER:openai-compatible}
+    # llama-server는 127.0.0.1:8081에서만 연다 (백엔드가 8080)
+    base-url: ${APP_LLM_BASE_URL:http://127.0.0.1:8081/v1}
+    model: ${APP_LLM_MODEL:qwen3-8b}
+    api-key: ${LLM_API_KEY:}
+    timeout: 5m
+    # 실행기에 연결하는 타임아웃. 넘으면 연결 실패(재시도 없음)
+    connect-timeout: 10s
+    # Qwen3 생각 모드 끄기 (chat_template_kwargs.enable_thinking=false). Kanana는 false
+    disable-thinking: true
   # 프론트 주소만 허용한다. "*"는 쓰지 않는다.
   cors-allowed-origins:
     - http://localhost:5173
+
+---
+# 실행 시 저장소 루트의 .env(KEY=VALUE)를 설정으로 읽는다 (backend/에서 실행 기준). 없으면 건너뛴다.
+# 테스트 프로필에서는 읽지 않는다: 자동 테스트가 실제 비밀값에 닿지 않게 한다 (rules/testing.md)
+spring:
+  config:
+    activate:
+      on-profile: "!test"
+    import: optional:file:../.env[.properties]
