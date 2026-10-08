@@ -75,14 +75,19 @@
 - reviewer 반영: HTTP 테스트에 고정 시계(실제 시계로는 정각 분에 초기화되어 가끔 실패), 창 경계 경쟁 상태(늦게 온 앞 창 요청이 다음 창 카운터를 초기화) 수정, 설정값 연결·동시성 테스트 추가
 - W6: 작업 생성 제한 설정은 RateLimitProperties에 추가하고, HTTP 테스트는 고정 시계(PreviewRateLimitTest.FixedClockConfig 방식)를 쓴다
 
-### W6. 작업 생성, 작업 생성 요청 수 제한, 보관 기간 삭제
-- JobController, JobService, Job, JobUtterance, 저장소, RetentionCleanupJob
+### W6. 작업 생성, 작업 생성 요청 수 제한, 보관 기간 삭제 ✅ 완료 (8e9f7b0)
+- JobController, JobService, JobRepository(JdbcTemplate 저장소, 엔티티 없음), RetentionCleanupJob
+- 저장: JPA 엔티티 대신 JdbcTemplate batch insert (발언 최대 5만 줄, CHAR(36) 스키마 검증 문제 회피)
 - 작업 생성: createsJobWithUuidV4AndStoresUtterances, previewMatchesJobSplit, createJobRejectsBlankOverLengthNul, createJobRejectsNoUtterances
 - 요청 수 제한(S4): jobCreationOverLimitReturns429, jobLimitUsesSeparateConfig
 - 보관 기간(S2): deletesJobsAndUtterancesOlderThanRetention(24시간 1분), keepsJobsWithinRetention(23시간 59분), retentionIsConfigurable. 스케줄 메서드를 직접 호출해 테스트
 - 로그에는 작업 ID 대신 경로 패턴만 남긴다 (작업 ID가 곧 열람 권한). 테스트: jobIdNotInLogs
 - 요청·응답 객체의 toString에 본문·화자 이름·작업 ID를 넣지 않는다 (Spring 웹 DEBUG 로그가 toString으로 남김, W4와 같은 처리). 테스트: jobCreationDoesNotLogInputBody — 웹 DEBUG 로그를 켜고 발언 내용·화자 자리 표식, 깨진 JSON(ASCII 표식)이 로그에 없는지 확인
 - 정리(LLM) 시작은 F2에서 붙인다
+- 결과: `POST /api/jobs` → 201 `{"jobId"}`, ScriptParser(미리보기·작업 생성 공용), RetentionProperties(`app.retention` 24h, `app.retention-cleanup-interval` 10m, 테스트 프로필 365d), RateLimitProperties.jobPerHour(기본 20, `application-dev.yml` 200), V2 마이그레이션(content VARCHAR(2000000)), H2 `TRACE_LEVEL_FILE=0`. 전체 128개 통과
+- 추가 테스트: jobIdsAreDistinct, storesMaxLengthLineOfSupplementaryCharacters, createdAtIsClockInstant, JobServiceTransactionTest.failedUtteranceInsertRollsBackJob, RateLimitPropertiesTest 2개, H2TraceFileDisabledTest
+- reviewer 반영: 보충 평면 문자 줄 저장 500(V2, 사용자 결정 VARCHAR(2000000)), H2 trace 파일 본문 기록(사용자 결정 TRACE_LEVEL_FILE=0, ADR 0005), created_at·트랜잭션 테스트, 테스트 중 스케줄 삭제 끼어듦
+- 재리뷰(낮음) 후속: 롤백 테스트에 job INSERT 실행 단언 추가, 배포 시 점검에 TRACE_LEVEL_FILE=0 유지 확인 추가. 1,000,000자 설정 저장 테스트는 넣지 않음(사용자 결정: 보충 평면 최대 길이 테스트로 충분, 요청 4MB라 느림)
 
 ### W7. 파일 읽기 (프론트)
 - src/features/input/readScriptFile.ts, limits.ts
@@ -117,6 +122,7 @@
 
 #### 기타
 - H2와 PostgreSQL의 세부 동작 차이(타입, 대소문자, 시간대) 확인, PostgreSQL로 옮길 때 `flyway-database-postgresql` 추가 (ADR 0005)
+- 운영 데이터소스 URL에 `TRACE_LEVEL_FILE=0`이 유지되는지 (환경 변수 `SPRING_DATASOURCE_URL`이나 프로필 yml이 덮어쓰지 않았는지, ADR 0005)
 
 - 클라우드 리뷰 1회 (명령 이름은 그때 확인. 분할 규칙, 요청 수 제한, 보관 기간 삭제 집중)
 - F2 계획 시 로컬 LLM 실행기 결정: OpenAI 호환 로컬 클라이언트 하나로 llama.cpp(Vulkan)와 Ollama를 설정으로 바꿔 끼우고 eval로 속도·근거 탐지율 비교 (ADR 0002 갱신)

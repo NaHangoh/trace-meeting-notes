@@ -6,9 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -35,6 +38,8 @@ class JobServiceTransactionTest {
         assertThatThrownBy(() -> service.create("김민수: 안녕하세요"))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
+        // 작업 INSERT가 실제로 실행된 뒤 실패했는지 확인한다. 저장 순서가 바뀌면 롤백 없이도 개수가 같을 수 있다
+        verify(jdbc).update(startsWith("INSERT INTO job ("), ArgumentMatchers.<Object>any(), ArgumentMatchers.<Object>any());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM job", Integer.class)).isEqualTo(jobsBefore);
     }
 }
