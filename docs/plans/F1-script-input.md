@@ -73,6 +73,7 @@
 - 요청 수 제한(S4): jobCreationOverLimitReturns429, jobLimitUsesSeparateConfig
 - 보관 기간(S2): deletesJobsAndUtterancesOlderThanRetention(24시간 1분), keepsJobsWithinRetention(23시간 59분), retentionIsConfigurable. 스케줄 메서드를 직접 호출해 테스트
 - 로그에는 작업 ID 대신 경로 패턴만 남긴다 (작업 ID가 곧 열람 권한). 테스트: jobIdNotInLogs
+- 요청·응답 객체의 toString에 본문·화자 이름·작업 ID를 넣지 않는다 (Spring 웹 DEBUG 로그가 toString으로 남김, W4와 같은 처리). 테스트: jobCreationDoesNotLogInputBody — 웹 DEBUG 로그를 켜고 발언 내용·화자 자리 표식, 깨진 JSON(ASCII 표식)이 로그에 없는지 확인
 - 정리(LLM) 시작은 F2에서 붙인다
 
 ### W7. 파일 읽기 (프론트)

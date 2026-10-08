@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -76,6 +77,68 @@ class AppPropertiesTest {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(AppProperties.class).corsAllowedOrigins()).isEmpty();
         });
+    }
+
+    /** 범위: maxScriptChars 1~1,000,000, maxRequestBytes 1~10,485,760(10MB). 0·음수·초과는 시작 실패. */
+    @ParameterizedTest
+    @CsvSource({
+            "0, 204800",
+            "-1, 204800",
+            "1000001, 10485760",
+            "50000, 0",
+            "50000, -1",
+            "50000, 10485761"
+    })
+    void invalidLimitsFailStartup(int maxScriptChars, int maxRequestBytes) {
+        new ApplicationContextRunner()
+                .withUserConfiguration(Config.class)
+                .withPropertyValues("app.max-script-chars=" + maxScriptChars,
+                        "app.max-request-bytes=" + maxRequestBytes)
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void missingLimitsFailStartup() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(Config.class)
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    /** 범위 끝값은 통과한다(1,000,000자 × 4 + 여유분 ≤ 10MB). */
+    @Test
+    void boundaryLimitsStartNormally() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(Config.class)
+                .withPropertyValues("app.max-script-chars=1000000", "app.max-request-bytes=10485760")
+                .run(context -> assertThat(context).hasNotFailed());
+        new ApplicationContextRunner()
+                .withUserConfiguration(Config.class)
+                .withPropertyValues("app.max-script-chars=1", "app.max-request-bytes=" + (4 + AppProperties.JSON_OVERHEAD_BYTES))
+                .run(context -> assertThat(context).hasNotFailed());
+    }
+
+    /** 바이트 상한이 글자 수 상한을 4바이트 문자로 채운 JSON보다 작으면 시작 실패. 기본값은 통과. */
+    @Test
+    void limitsAreConsistent() {
+        int minimum = 50_000 * 4 + AppProperties.JSON_OVERHEAD_BYTES;
+
+        new ApplicationContextRunner()
+                .withUserConfiguration(Config.class)
+                .withPropertyValues("app.max-script-chars=50000", "app.max-request-bytes=" + (minimum - 1))
+                .run(context -> assertThat(context).hasFailed());
+        new ApplicationContextRunner()
+                .withUserConfiguration(Config.class)
+                .withPropertyValues("app.max-script-chars=50000", "app.max-request-bytes=" + minimum)
+                .run(context -> assertThat(context).hasNotFailed());
+        runner.run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @Test
+    void limitMessageNamesKeyWithoutValue() {
+        assertThatThrownBy(() -> new AppProperties(1_234_567, 204_800, List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("app.max-script-chars")
+                .message().doesNotContain("1234567");
     }
 
     @Test
