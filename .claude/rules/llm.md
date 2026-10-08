@@ -2,7 +2,7 @@
 
 ## 구조
 - 모든 LLM 호출은 `LlmClient` 인터페이스를 거친다. 서비스 코드에서 특정 모델 SDK를 직접 부르지 않는다.
-- 구현체: `OllamaLlmClient`(개발용, 무료), `ClaudeLlmClient`(정확도 측정·시연용), `FixtureLlmClient`(테스트용).
+- 구현체: `OpenAiCompatibleLlmClient`(llama-server·Ollama 공용, 주소·모델·키는 설정), `FixtureLlmClient`(테스트용). Claude 구현체는 eval 비교 단계에서 추가한다.
 - 어떤 모델을 쓸지는 설정(`app.llm.provider`)으로만 바꾼다.
 
 ## 프롬프트

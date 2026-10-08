@@ -18,7 +18,7 @@
 | 결과 형식 | 평면 `items` + 원문 표현(`assignee`·`due`), 근거 확인은 공백 정규화 후 부분 일치(화자 이름 포함) | SPEC F2 |
 | 덩어리 | 최대 6,000자(설정값), 발언 경계. 6,000자 넘는 발언은 잘라 같은 번호로 | SPEC F2 |
 | 실패 처리 | 호출 타임아웃 5분, 형식 오류만 재시도 최대 2회, 타임아웃·연결 거부는 바로 실패 | SPEC F2 |
-| 동시 작업 | 전역 1개, 대기열 10(설정값), 초과 429 `QUEUE_FULL`, 재시작 시 `SERVER_RESTART` | ADR 0007 |
+| 동시 작업 | 작업자 `app.summary.workers`(기본 1), 대기열 10(설정값), 초과 429 `QUEUE_FULL`, 재시작 시 `SERVER_RESTART`. `SummaryQueue` 인터페이스 뒤 메모리 구현 | ADR 0007 |
 | 조회 | `GET /api/jobs/{id}` IP당 분당 120회(설정값). 형식 틀린·없는·삭제된 ID는 같은 404 | SPEC F2 |
 | 결과 화면 | `#/jobs/{id}` 해시 라우팅(새 의존성 없음), 2초 조회(설정값) | SPEC F2 |
 | 오류 코드 | 기존 `TOO_MANY_REQUESTS` 유지, `QUEUE_FULL` 추가 | ADR 0007 |
@@ -51,9 +51,10 @@
 - 테스트: v3MigrationApplies, statusTransitionsPersisted, resultsDeletedWithJobAfterRetention
 
 ### W6. 대기열·작업자와 다시 시도
-- `SummarizeQueue`(작업자 1개, 상한 10), 작업 생성 시 자리를 먼저 확보한 뒤 저장(가득 차면 작업을 만들지 않음), 시작 시 `QUEUED`·`RUNNING` → `FAILED(SERVER_RESTART)`
+- `SummaryQueue` 인터페이스와 메모리 구현(작업자 수 `app.summary.workers` 기본 1, 상한 10), 작업 생성 시 자리를 먼저 확보한 뒤 저장(가득 차면 작업을 만들지 않음), 시작 시 `QUEUED`·`RUNNING` → `FAILED(SERVER_RESTART)`
+- 확장 경로(ADR 0007): 서버 여러 대는 DB 구현(`SELECT … FOR UPDATE SKIP LOCKED`)으로 교체, 요청 수 제한기는 Redis나 DB로
 - `POST /api/jobs/{id}/retry`: `FAILED`만(그 밖 409), 작업 생성과 같은 S4 제한기·대기열 상한
-- 테스트: queuedRunningDoneLifecycle, queueFullReturns429QueueFullAndCreatesNoJob, concurrentCreationNeverExceedsQueueLimit, retryOnlyForFailed409Otherwise, retryCountsTowardJobLimit, retryRespectsQueueLimit, restartMarksQueuedAndRunningFailed, restartFailedJobCanRetry
+- 테스트: workersFollowConfig, queuedRunningDoneLifecycle, queueFullReturns429QueueFullAndCreatesNoJob, concurrentCreationNeverExceedsQueueLimit, retryOnlyForFailed409Otherwise, retryCountsTowardJobLimit, retryRespectsQueueLimit, restartMarksQueuedAndRunningFailed, restartFailedJobCanRetry
 
 ### W7. 조회 API
 - `GET /api/jobs/{id}` → `{status, failure?, items?}` (발언 본문 없음), 조회 제한기(GET, 분당 120회), 404 통일, 요청·응답 toString에서 값 숨김
@@ -72,7 +73,6 @@
 - llama-server가 `response_format`(JSON 스키마)과 `chat_template_kwargs`를 받는지: W1 끝 `@Tag("llm")`로 확인
 - Ollama의 OpenAI 호환 엔드포인트가 `response_format` JSON 스키마를 받는지: 비교할 때 확인, 안 되면 한계로 기록
 - 덩어리 6,000자와 `-c 16384`가 노트북에서 5분 안에 끝나는지: 실측으로 조정
-- `.claude/rules/backend.md`("Spring AI는 F2에서 추가")와 `.claude/rules/llm.md`(구현체 `OllamaLlmClient`·`ClaudeLlmClient`)가 ADR 변경과 다름: 사용자 확인 후 수정
 
 ## F2 완료 후
 - /docs-sync F2 (README 실행 명령 실측 반영, ARCHITECTURE에 llm 패키지와 정리 흐름 시퀀스)
