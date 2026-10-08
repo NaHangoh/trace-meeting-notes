@@ -50,11 +50,16 @@
 - 근거 번호: 존재하지 않거나 덩어리 범위 밖이면 버림, 남은 근거가 없으면 "근거 없음"
 - 담당자·기한: 근거 발언의 화자 이름과 내용에 공백 정규화 후 부분 일치할 때만 유지
 - 테스트: dropsUnknownFields, dropsOverlongText, dropsUnknownType, capsItemsPerChunk, dropsEvidenceOutsideChunk, itemWithoutEvidenceIsUnsupported, keepsAssigneeFoundInSpeakerOrText, clearsAssigneeAndDueNotInEvidence, whitespaceVariantsMatch(전각 공백은 `Character.toString(0x3000)`), invalidJsonIsFormatError
+- ✅ 완료 (6c455d0). 결과: SummaryValidator, SummaryItem(toString에서 내용·담당자 숨김), SummaryItemType, InvalidSummaryOutputException, `minutes.Whitespace` public 전환·`normalize`. 백엔드 244개 통과
+- 판정 기준: 최상위 JSON 객체·items 배열이 아니면 형식 오류(INVALID_OUTPUT, 다시 부름), 항목 단위 문제는 그 항목·값만 버림. 근거 번호는 정수이고 덩어리에 있는 번호만, 처음 나온 순서, 중복 제거. 100개 상한은 남긴 항목만 셈
+- 결정(사용자, SPEC F2 반영): 담당자·기한은 공백 뺀 2자 이상만, 담당자는 근거 발언 화자 이름 전체 일치 또는 내용 부분 일치, 기한은 내용에서만. 근거 발언 안의 다른 사람 이름은 코드로 못 가려 F3·사람 확인에 맡김
+- reviewer 반영: 부분 일치가 느슨함(중간, 위 결정), 낮음 5건(큰 정수·3.0·null 근거, 상한 세는 방식, 값 쪽 공백 정규화, 근거 없는 TODO·객체 아닌 원소, text 앞뒤 공백을 Whitespace.strip으로)
 
 ### W4. 덩어리 나누기와 정리 실행
 - `ScriptChunker`(6,000자, 발언 경계, 넘는 발언은 잘라 같은 번호), `SummarizeService`(덩어리별 호출 → 검증 → 이어 붙이기, 형식 오류만 재시도 2회)
 - 로그: 재시도 횟수와 실패 사유 종류만 (본문·화자·작업 ID 없음)
 - 테스트: chunkBoundariesKeepUtteranceNumbers(덩어리 3개), oversizedUtteranceSplitKeepsNumber, invalidOutputRetriesTwiceThenFails(호출 3회), timeoutFailsWithoutRetry(호출 1회), connectionRefusedFailsWithoutRetry, resultsConcatenatedInChunkOrder, logsHaveOnlyRetryCountAndFailureKind
+- 완료 조건(W2에서 넘김): 빌더 → 실제 클라이언트를 거친 요청 본문을 가짜 HTTP 서버로 확인. `response_format` 있음, `tools`·`functions`·`tool_choice` 없음, 발언은 구분자 블록 안에만(시스템 메시지에 발언 없음). 덩어리마다 그 덩어리의 발언만 블록에 들어감
 
 ### W5. 저장 (마이그레이션 V3)
 - `job`에 status·failure 열, `summary_item`(작업·순번·종류·내용·담당자·기한), `summary_evidence`(항목·발언 번호). 모두 FK CASCADE. 표준 SQL만 (ADR 0005)
@@ -64,6 +69,7 @@
 - `SummaryQueue` 인터페이스와 메모리 구현(작업자 수 `app.summary.workers` 기본 1, 상한 10), 작업 생성 시 자리를 먼저 확보한 뒤 저장(가득 차면 작업을 만들지 않음), 시작 시 `QUEUED`·`RUNNING` → `FAILED(SERVER_RESTART)`
 - 확장 경로(ADR 0007): 서버 여러 대는 DB 구현(`SELECT … FOR UPDATE SKIP LOCKED`)으로 교체, 요청 수 제한기는 Redis나 DB로
 - `POST /api/jobs/{id}/retry`: `FAILED`만(그 밖 409), 작업 생성과 같은 S4 제한기·대기열 상한
+- W4에서 넘김: 요청 조립(`SummaryPromptBuilder`)의 `IllegalStateException` 등 정리 중 예상 밖 예외를 작업 실패로 바꿀지 결정하고 처리 (지금은 `SummaryFailedException`으로 바뀌지 않음)
 - 테스트: workersFollowConfig, queuedRunningDoneLifecycle, queueFullReturns429QueueFullAndCreatesNoJob, concurrentCreationNeverExceedsQueueLimit, retryOnlyForFailed409Otherwise, retryCountsTowardJobLimit, retryRespectsQueueLimit, restartMarksQueuedAndRunningFailed, restartFailedJobCanRetry
 
 ### W7. 조회 API
@@ -88,3 +94,4 @@
 - /docs-sync F2 (README 실행 명령 실측 반영, ARCHITECTURE에 llm 패키지와 정리 흐름 시퀀스)
 - /eval로 Qwen3-8B와 Kanana 1.5 8B 비교, 덩어리 크기·`-c` 조정
 - Claude 구현과 하루 호출 상한은 eval 비교 단계에서 결정
+- 공개 전 예시·테스트 화자 이름을 가상 표기(화자1 등)로 바꿀지 검토 (SPEC 예시와 F1 테스트의 김민수·이영희·박준호 등, security-checker 참고 의견)

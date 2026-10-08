@@ -45,6 +45,8 @@ app:
   # SPEC F2: 정리 프롬프트 버전 (prompts/summarize.{버전}.md). 바꾸기 전에 /eval로 비교한다
   summary:
     prompt-version: v2
+    # 덩어리 최대 글자 수 (요청 줄 "[번호] 화자: 내용" 기준). eval·노트북 실측으로 조정
+    chunk-size: 6000
   # 프론트 주소만 허용한다. "*"는 쓰지 않는다.
   cors-allowed-origins:
     - http://localhost:5173
