@@ -8,6 +8,11 @@ public record ApiError(String code, String message) {
     static final ApiError PAYLOAD_TOO_LARGE = new ApiError("PAYLOAD_TOO_LARGE", "요청 크기가 상한을 넘었습니다.");
     static final ApiError MALFORMED_REQUEST = new ApiError("MALFORMED_REQUEST", "요청 형식이 올바르지 않습니다.");
     static final ApiError TOO_MANY_REQUESTS = new ApiError("TOO_MANY_REQUESTS", "요청이 너무 많습니다. 잠시 후 다시 시도하세요.");
+    /** 요청 수 제한(TOO_MANY_REQUESTS)과 화면 문구를 구분한다 (ADR 0007). */
+    static final ApiError QUEUE_FULL = new ApiError("QUEUE_FULL", "대기 중인 정리 작업이 많습니다. 잠시 후 다시 시도하세요.");
+    /** 형식이 틀린 ID, 없는 ID, 삭제된 ID를 구분하지 않는다. */
+    static final ApiError NOT_FOUND = new ApiError("NOT_FOUND", "작업을 찾을 수 없습니다.");
+    static final ApiError NOT_RETRYABLE = new ApiError("NOT_RETRYABLE", "실패한 작업만 다시 시도할 수 있습니다.");
     static final ApiError REQUEST_ERROR = new ApiError("REQUEST_ERROR", "요청을 처리할 수 없습니다.");
     static final ApiError INTERNAL_ERROR = new ApiError("INTERNAL_ERROR", "서버 오류가 발생했습니다.");
 

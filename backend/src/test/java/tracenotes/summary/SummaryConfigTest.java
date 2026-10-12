@@ -65,6 +65,25 @@ class SummaryConfigTest {
         runner.run(context -> assertThat(context.getBean(SummaryProperties.class).chunkSize()).isEqualTo(6000));
     }
 
+    /** SPEC F2 동시 작업, ADR 0007: 작업자 1개, 대기열 10개(설정값). */
+    @Test
+    void defaultWorkersIs1AndQueueCapacityIs10() {
+        runner.run(context -> {
+            assertThat(context.getBean(SummaryProperties.class).workers()).isEqualTo(1);
+            assertThat(context.getBean(SummaryProperties.class).queueCapacity()).isEqualTo(10);
+        });
+    }
+
+    @Test
+    void workersAndQueueCapacityBelowOneFailStartup() {
+        runner.withPropertyValues("app.summary.workers=0")
+                .run(context -> assertThat(context.getStartupFailure()).rootCause()
+                        .hasMessageContaining("app.summary.workers"));
+        runner.withPropertyValues("app.summary.queue-capacity=0")
+                .run(context -> assertThat(context.getStartupFailure()).rootCause()
+                        .hasMessageContaining("app.summary.queue-capacity"));
+    }
+
     @Test
     void chunkSizeBelowMinimumFailsStartup() {
         runner.withPropertyValues("app.summary.chunk-size=99")

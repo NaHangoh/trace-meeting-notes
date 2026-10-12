@@ -47,6 +47,9 @@ app:
     prompt-version: v2
     # 덩어리 최대 글자 수 (요청 줄 "[번호] 화자: 내용" 기준). eval·노트북 실측으로 조정
     chunk-size: 6000
+    # ADR 0007: 동시에 실행하는 정리 작업 수와 기다리는(QUEUED) 작업 상한. 넘으면 429 QUEUE_FULL
+    workers: 1
+    queue-capacity: 10
   # 프론트 주소만 허용한다. "*"는 쓰지 않는다.
   cors-allowed-origins:
     - http://localhost:5173

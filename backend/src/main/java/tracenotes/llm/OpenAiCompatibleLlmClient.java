@@ -92,8 +92,9 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             LlmFailureKind kind = classify(e);
             throw new LlmCallException(kind, kind == LlmFailureKind.TIMEOUT ? "LLM call timed out" : "LLM connection failed");
         } catch (InterruptedException e) {
+            // 서버 종료로 작업자가 중단됨. 중단 표시는 유지한다
             Thread.currentThread().interrupt();
-            throw new LlmCallException(LlmFailureKind.TIMEOUT, "LLM call interrupted");
+            throw new LlmCallException(LlmFailureKind.INTERRUPTED, "LLM call interrupted");
         }
     }
 

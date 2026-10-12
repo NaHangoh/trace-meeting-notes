@@ -16,6 +16,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import tracenotes.summary.SummaryFailure;
 
 @SpringBootTest
 class FlywayMigrationTest {
@@ -84,11 +85,23 @@ class FlywayMigrationTest {
                 .as("failure on DONE").isInstanceOf(DataIntegrityViolationException.class);
 
         for (String failure : List.of("INVALID_OUTPUT", "TIMEOUT", "CONNECTION_REFUSED", "LLM_ERROR",
-                "SERVER_RESTART")) {
+                "SERVER_RESTART", "INTERNAL_ERROR")) {
             jdbcTemplate.update("UPDATE job SET status = 'FAILED', failure = ? WHERE id = ?", failure, id);
         }
         for (String status : List.of("QUEUED", "RUNNING", "DONE")) {
             jdbcTemplate.update("UPDATE job SET status = ?, failure = NULL WHERE id = ?", status, id);
+        }
+    }
+
+    /** DB의 실패 사유 제약과 SummaryFailure 값이 같다 (V4에서 INTERNAL_ERROR 추가). */
+    @Test
+    @Transactional
+    void everySummaryFailureFitsConstraint() {
+        String id = UUID.randomUUID().toString();
+        jdbcTemplate.update("INSERT INTO job (id, created_at) VALUES (?, CURRENT_TIMESTAMP)", id);
+
+        for (SummaryFailure failure : SummaryFailure.values()) {
+            jdbcTemplate.update("UPDATE job SET status = 'FAILED', failure = ? WHERE id = ?", failure.name(), id);
         }
     }
 

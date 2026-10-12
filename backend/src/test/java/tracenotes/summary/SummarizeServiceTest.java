@@ -152,6 +152,19 @@ class SummarizeServiceTest {
         assertThat(calls).hasValue(1);
     }
 
+    /** 서버 종료로 호출이 중단되면 SERVER_RESTART이고 다시 부르지 않는다 (SPEC F2 실패 처리 표). */
+    @Test
+    void interruptedCallIsServerRestartWithoutRetry() {
+        respond(request -> {
+            throw new LlmCallException(LlmFailureKind.INTERRUPTED, "interrupted");
+        });
+
+        assertThatThrownBy(() -> service.summarize(NINE))
+                .isInstanceOfSatisfying(SummaryFailedException.class,
+                        e -> assertThat(e.reason()).isEqualTo(SummaryFailure.SERVER_RESTART));
+        assertThat(calls).hasValue(1);
+    }
+
     /** 실행기가 2xx가 아닌 상태로 답하면 LLM_ERROR이고 다시 부르지 않는다. */
     @Test
     void httpErrorIsLlmErrorWithoutRetry() {

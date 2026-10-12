@@ -62,6 +62,8 @@ public class SummarizeService {
                     case MALFORMED_RESPONSE -> retryOrFail(retries);
                     case TIMEOUT -> throw fail(SummaryFailure.TIMEOUT, retries, null);
                     case CONNECTION_REFUSED -> throw fail(SummaryFailure.CONNECTION_REFUSED, retries, null);
+                    // 서버 종료로 작업자가 중단됨. 재시작과 같은 실패로 본다
+                    case INTERRUPTED -> throw fail(SummaryFailure.SERVER_RESTART, retries, null);
                     // LlmCallException 메시지는 상태 코드만 담은 고정 문구다 (응답 본문 없음)
                     case HTTP_ERROR -> throw fail(SummaryFailure.LLM_ERROR, retries, e.getMessage());
                 };

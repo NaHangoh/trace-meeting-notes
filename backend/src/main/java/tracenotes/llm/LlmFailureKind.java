@@ -9,5 +9,7 @@ public enum LlmFailureKind {
     /** 실행기가 2xx가 아닌 상태 코드로 답함. */
     HTTP_ERROR,
     /** 응답이 OpenAI 형식이 아님 (choices[0].message.content 없음). */
-    MALFORMED_RESPONSE
+    MALFORMED_RESPONSE,
+    /** 호출 중 스레드가 중단됨 (서버 종료로 작업자가 멈춤). */
+    INTERRUPTED
 }

@@ -131,7 +131,7 @@
 - API:
   - `GET /api/jobs/{id}` → `{status, failure?, items?}`. 발언 본문은 넣지 않는다. IP당 분당 120회(설정값), 넘으면 429 `TOO_MANY_REQUESTS`. 형식이 틀린 ID, 존재하지 않는 ID, 보관 기간이 지나 삭제된 ID는 모두 같은 404. 로그인이 없으므로 작업 ID를 아는 사람이 곧 열람 권한자다(S1).
   - `POST /api/jobs/{id}/retry` → 실패한 작업만 다시 실행. 그 밖의 상태는 409.
-- 상태: `QUEUED`, `RUNNING`, `DONE`, `FAILED`. 실패 사유: `INVALID_OUTPUT`, `TIMEOUT`, `CONNECTION_REFUSED`, `LLM_ERROR`, `SERVER_RESTART`.
+- 상태: `QUEUED`, `RUNNING`, `DONE`, `FAILED`. 실패 사유: `INVALID_OUTPUT`, `TIMEOUT`, `CONNECTION_REFUSED`, `LLM_ERROR`, `SERVER_RESTART`, `INTERNAL_ERROR`.
 - 저장: 작업 상태·실패 사유와 결과 항목을 저장한다(마이그레이션). 결과도 보관 기간 삭제(S2) 대상이다.
 
 #### 실패 처리
@@ -145,11 +145,13 @@
   | 호출 타임아웃 | `TIMEOUT` | 안 함 |
   | 연결 거부, 연결 타임아웃, 응답 도중 연결 끊김 | `CONNECTION_REFUSED` | 안 함 |
   | 실행기가 2xx가 아닌 상태로 답함 (키 오류 401, 컨텍스트 초과 400, 모델 로딩 중 503 등) | `LLM_ERROR` | 안 함. 로그에는 HTTP 상태 코드만 남기고 응답 본문은 남기지 않는다 |
+  | 서버 종료로 실행 중인 호출이 중단됨 | `SERVER_RESTART` | 안 함 |
+  | 그 밖의 예상 밖 서버 오류 (결과 저장 실패, 요청 조립 오류 등) | `INTERNAL_ERROR` | 안 함. 사용자가 "다시 시도"로만 다시 실행한다. 로그에는 실패 종류와 예외 클래스 이름만 남기고 예외 메시지·SQL·스택은 남기지 않는다(메시지에 SQL과 작업 ID가 들어갈 수 있다) |
 - 실패 시 고정 문구와 "다시 시도" 버튼(같은 작업 재실행). 다시 시도도 작업 생성과 같은 요청 수 제한(S4)과 대기열 상한을 적용받는다.
-- 로그에는 재시도 횟수와 실패 사유 종류(형식 오류, 타임아웃, 연결 거부)만 남긴다. 본문, 화자 이름, 작업 ID는 남기지 않는다.
+- 로그에는 재시도 횟수와 실패 사유 종류만 남긴다. `INTERNAL_ERROR`일 때만 예외 클래스 이름을 더한다(메시지·SQL·스택 없음). 본문, 화자 이름, 작업 ID는 남기지 않는다.
 
 #### 동시 작업
-- 정리는 전역 1개만 실행한다. 대기열은 최대 10개(설정값). 넘으면 작업 생성과 다시 시도를 429 `QUEUE_FULL`로 거부하고 작업을 만들지 않는다. 화면 문구는 `TOO_MANY_REQUESTS`와 구분한다.
+- 정리는 전역 1개만 실행한다. 대기열은 최대 10개(설정값). 대기열 상한은 기다리는(`QUEUED`) 작업 수이고, 실행 중인 작업(작업자 수만큼)은 따로 센다. 넘으면 작업 생성과 다시 시도를 429 `QUEUE_FULL`로 거부하고 작업을 만들지 않는다. 화면 문구는 `TOO_MANY_REQUESTS`와 구분한다.
 - 서버가 시작될 때 `QUEUED`·`RUNNING`이던 작업은 `FAILED`(`SERVER_RESTART`)로 바꾼다. 다시 시도할 수 있다.
 
 #### 수용 기준
@@ -165,6 +167,7 @@
 - [ ] JSON·스키마가 틀리면 최대 2회 다시 부르고(총 3회), 그래도 틀리면 `FAILED`(`INVALID_OUTPUT`)이다.
 - [ ] 타임아웃·연결 거부는 다시 부르지 않고(1회) 바로 `FAILED`다.
 - [ ] 실행기가 2xx가 아닌 상태로 답하면 다시 부르지 않고 `FAILED`(`LLM_ERROR`)이고, 로그에는 상태 코드만 있다. OpenAI 형식이 아닌 응답은 `INVALID_OUTPUT`과 같이 최대 2회 다시 부른다.
+- [ ] 결과 저장 실패 같은 예상 밖 오류로 실패하면 `FAILED`(`INTERNAL_ERROR`)이고 자동으로 다시 실행하지 않는다. 로그·응답에 예외 메시지·SQL·스택이 없고 실패 종류만 있다.
 - [ ] 다시 시도는 `FAILED` 작업만 되고(그 밖은 409), 같은 발언으로 다시 정리하며, S4 제한과 대기열 상한을 적용받는다.
 - [ ] 대기열이 10개를 넘으면 작업 생성은 429 `QUEUE_FULL`이고 작업이 생기지 않는다.
 - [ ] 서버를 다시 시작하면 `QUEUED`·`RUNNING` 작업은 `FAILED`(`SERVER_RESTART`)가 되고 다시 시도할 수 있다.
@@ -179,6 +182,11 @@
 - 기본: Qwen3-8B (공식 GGUF `Qwen/Qwen3-8B-GGUF`, Apache 2.0, Q4_K_M 5.03GB). 생각 모드는 끈다.
 - 비교: Kanana 1.5 8B Instruct (`kakaocorp/kanana-1.5-8b-instruct-2505`, Apache 2.0). 커뮤니티 GGUF 대신 공식 원본을 llama.cpp 변환 스크립트로 직접 변환한다.
 - 다운로드와 해시 확인은 사용자가 한다. 모델 선택은 eval 지표(JSON 성공률, 근거 위치 정확도, 인젝션 케이스)와 노트북 처리 시간으로 정한다.
+
+#### 알려진 한계
+- 작업 상태를 바꾸는 DB 호출 자체가 실패하면 작업이 `RUNNING`에 남는다. 서버 재시작 시 복구 로직이 `FAILED`(`SERVER_RESTART`)로 바꾼다. 그 전까지는 다시 시도도 409다.
+- 서버 종료 중에 받은 작업 생성·다시 시도는 저장된 뒤 대기열이 받지 않아 500이 될 수 있다. 이때 작업은 `QUEUED`로 남고(생성이면 사용자는 작업 ID를 받지 못한다) 다음 시작 때 `FAILED`(`SERVER_RESTART`)가 되며, 보관 기간이 지나면 지워진다.
+- Spring의 DEBUG 로그(`org.springframework.web`)에는 처리하지 못한 예외 메시지가 남을 수 있다. 운영에서는 이 로거의 DEBUG를 켜지 않는다(기본 INFO).
 
 #### 범위 밖
 - Claude API 구현과 S4의 Claude 하루 호출 상한 (eval 비교 단계)

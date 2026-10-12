@@ -5,6 +5,10 @@ spring:
 app:
   # 스케줄 삭제가 테스트 도중 끼어들지 않게 한다. 테스트는 deleteExpired()를 직접 호출한다.
   retention-cleanup-interval: 365d
+  summary:
+    # 작업을 빠르게 많이 만드는 테스트(요청 수 제한 등)가 대기열 상한에 걸리지 않게 한다.
+    # 대기열 상한을 확인하는 테스트는 상한을 따로 정한다 (SummaryJobFlowTest)
+    queue-capacity: 1000
   llm:
     # 자동 테스트는 실제 LLM을 부르지 않는다 (rules/llm.md)
     provider: fixture

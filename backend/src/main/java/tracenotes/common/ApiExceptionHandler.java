@@ -10,7 +10,11 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.HandlerMapping;
 import tracenotes.minutes.InvalidScriptException;
+import tracenotes.summary.JobNotFoundException;
+import tracenotes.summary.JobNotRetryableException;
+import tracenotes.summary.QueueFullException;
 
 /** 예외를 공통 오류 응답으로 바꾼다. 응답과 로그에 입력 본문·예외 메시지를 넣지 않는다. */
 @RestControllerAdvice
@@ -21,6 +25,21 @@ public class ApiExceptionHandler {
     @ExceptionHandler(InvalidScriptException.class)
     ResponseEntity<ApiError> invalidScript(InvalidScriptException e) {
         return ResponseEntity.badRequest().body(ApiError.of(e.getReason()));
+    }
+
+    @ExceptionHandler(QueueFullException.class)
+    ResponseEntity<ApiError> queueFull() {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(ApiError.QUEUE_FULL);
+    }
+
+    @ExceptionHandler(JobNotFoundException.class)
+    ResponseEntity<ApiError> jobNotFound() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.NOT_FOUND);
+    }
+
+    @ExceptionHandler(JobNotRetryableException.class)
+    ResponseEntity<ApiError> jobNotRetryable() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiError.NOT_RETRYABLE);
     }
 
     /** JSON 파싱 오류 메시지에는 입력 일부가 들어갈 수 있어 고정 문구로 바꾼다. */
@@ -36,8 +55,10 @@ public class ApiExceptionHandler {
             HttpStatusCode status = errorResponse.getStatusCode();
             return ResponseEntity.status(status).headers(errorResponse.getHeaders()).body(ApiError.REQUEST_ERROR);
         }
-        // 예외 메시지에 입력이 섞일 수 있어 클래스 이름과 경로만 남긴다
-        log.error("unhandled {} on {}", e.getClass().getName(), request.getRequestURI());
+        // 예외 메시지에 입력이 섞일 수 있어 클래스 이름과 경로 패턴만 남긴다.
+        // 실제 URI에는 작업 ID(곧 열람 권한)가 들어갈 수 있어(/api/jobs/{id}/retry) 매핑 패턴을 쓴다
+        Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        log.error("unhandled {} on {}", e.getClass().getName(), pattern != null ? pattern : "unmapped path");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiError.INTERNAL_ERROR);
     }
 }

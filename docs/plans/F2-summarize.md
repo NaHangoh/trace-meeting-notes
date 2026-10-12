@@ -63,17 +63,33 @@
 - 결과: ScriptChunker(최소 100자, 넘는 발언은 코드 포인트 단위로 잘라 같은 번호·화자), SummarizeService(형식 오류만 덩어리마다 최대 2회, 실패 시 남은 덩어리 안 부름, 실패 종류 분기는 switch 식), SummaryFailure·SummaryFailedException, `app.summary.chunk-size` 기본 6000. SummarizeRequestBodyTest로 완료 조건 확인(요청별 발언 [1,2,3]/[4,5,6]). 백엔드 269개 통과
 - reviewer 반영: 잘린 발언 결과의 근거 번호 유지, LLM_ERROR 로그에 상태 코드만(중간 2건, 테스트 추가), 낮음 3건(switch 식, chunk-size 전달 테스트, 요청별 발언 확인). 요청 조립 예외 변환은 W6으로
 
-### W5. 저장 (마이그레이션 V3)
+### W5. 저장 (마이그레이션 V3) ✅ 완료 (183b0db)
 - `job`에 status·failure 열, `summary_item`(작업·순번·종류·내용·담당자·기한), `summary_evidence`(항목·발언 번호). 모두 FK CASCADE. 표준 SQL만 (ADR 0005)
 - 테스트: v3MigrationApplies, statusTransitionsPersisted, resultsDeletedWithJobAfterRetention
 
-### W6. 대기열·작업자와 다시 시도
+### W6. 대기열·작업자와 다시 시도 ✅ 완료
 - `SummaryQueue` 인터페이스와 메모리 구현(작업자 수 `app.summary.workers` 기본 1, 상한 10), 작업 생성 시 자리를 먼저 확보한 뒤 저장(가득 차면 작업을 만들지 않음), 시작 시 `QUEUED`·`RUNNING` → `FAILED(SERVER_RESTART)`
 - 확장 경로(ADR 0007): 서버 여러 대는 DB 구현(`SELECT … FOR UPDATE SKIP LOCKED`)으로 교체, 요청 수 제한기는 Redis나 DB로
 - `POST /api/jobs/{id}/retry`: `FAILED`만(그 밖 409), 작업 생성과 같은 S4 제한기·대기열 상한
 - W4에서 넘김: 요청 조립(`SummaryPromptBuilder`)의 `IllegalStateException` 등 정리 중 예상 밖 예외를 작업 실패로 바꿀지 결정하고 처리 (지금은 `SummaryFailedException`으로 바뀌지 않음)
-- W5에서 넘김: `SummaryRepository.saveDone`이 DB 제약 위반 등으로 실패하면(롤백되어 `RUNNING`에 남음) `markFailed`로 작업 실패 처리
+- W5에서 넘김: `SummaryRepository.saveDone`이 DB 제약 위반 등으로 실패하면(롤백되어 `RUNNING`에 남음) `markFailed`로 작업 실패 처리. 이때 `DataIntegrityViolationException` 메시지에는 SQL과 키 값(작업 ID 등)이 들어갈 수 있으므로 예외 메시지·스택을 로그·응답에 넣지 않고 실패 종류만 남긴다 (W5 security-checker)
+- 완료 조건(W5에서 넘김): `saveDone` 실패 등 예상 밖 예외로 작업이 실패할 때 로그·응답에 예외 메시지·SQL·스택이 남지 않고 실패 종류만 남는지 테스트로 확인
 - 테스트: workersFollowConfig, queuedRunningDoneLifecycle, queueFullReturns429QueueFullAndCreatesNoJob, concurrentCreationNeverExceedsQueueLimit, retryOnlyForFailed409Otherwise, retryCountsTowardJobLimit, retryRespectsQueueLimit, restartMarksQueuedAndRunningFailed, restartFailedJobCanRetry
+- 결과: `SummaryQueue`(reserve → submit/cancel, 한 번만 적용)와 `MemorySummaryQueue`(Semaphore 자리, 작업자가 꺼낼 때 반환, 종료 시 interrupt), `SummaryJobRunner`(QUEUED → RUNNING → DONE/FAILED, 예상 밖 예외는 `INTERNAL_ERROR`, 로그는 실패 종류와 예외 클래스 이름만, 종료 중에도 마지막 상태 저장), `SummaryStartupRecovery`(대기열보다 먼저 생성), `SummaryRetryService`·`SummaryJobController`(`POST /api/jobs/{id}/retry`, 202·404·409·429), V4 마이그레이션(`INTERNAL_ERROR`를 실패 사유 제약에 추가), `app.summary.workers`·`queue-capacity`(1 미만이면 시작 실패). 백엔드 313개 통과
+- 테스트 이름 변경: `restartMarksQueuedAndRunningFailed`와 `restartFailedJobCanRetry`를 `restartMarksQueuedAndRunningFailedAndTheyCanRetry` 하나로 합침
+- 계획 외 변경과 이유
+  - `ApiError`·`ApiExceptionHandler`: `QUEUE_FULL`(429, ADR 0007), `NOT_FOUND`(404 통일), `NOT_RETRYABLE`(409). 처리하지 못한 예외 로그를 실제 URI 대신 매핑 패턴으로 남김 (`/api/jobs/{id}/retry`의 작업 ID가 곧 열람 권한)
+  - `RateLimitConfig`: `/api/jobs/*/retry`를 작업 생성과 같은 제한기에 추가 (SPEC F2 "다시 시도도 S4")
+  - `JobService`·`JobRepository`: 자리 확보 → 저장 → 대기열 넣기, 저장 실패 시 자리 반환. `@Transactional`을 `JobRepository.insert`로 옮겨 커밋된 뒤에 대기열에 넣음. 작업자용 `findUtterances` 추가
+  - `LlmFailureKind.INTERRUPTED` → `SERVER_RESTART` (W1에서 넘긴 InterruptedException 분류)
+  - `application-test.yml`의 `queue-capacity: 1000`: 작업을 많이 만드는 테스트가 대기열 상한에 걸리지 않게 함
+- 결정(사용자, 2026-10-12): `INTERNAL_ERROR` 추가와 SPEC F2 수정 승인. 로그 규칙은 "재시도 횟수와 실패 사유 종류만, `INTERNAL_ERROR`일 때만 예외 클래스 이름 추가". 상태를 바꾸는 DB 호출 자체가 실패해 `RUNNING`에 남는 경우는 SPEC F2 "알려진 한계"에 기록 (재시작 복구가 `SERVER_RESTART`로 바꾸고, 그 전까지는 다시 시도도 409)
+- reviewer·test-verifier 반영(테스트 4개 추가): QUEUED·RUNNING 다시 시도도 409이고 상태·자리 그대로(중간), 다시 시도가 같은 발언으로 정리하는지 요청 본문으로 확인(중간), 생성·다시 시도 제한기는 POST만 셈, 커밋 뒤에 대기열에 넣는지 다른 커넥션으로 확인(`JobService.create`에 `@Transactional`을 붙이면 실패하는 것 확인). 3회 반복 실행에서 불안정 없음
+- reviewer 낮음 5건, 결정(사용자, 2026-10-12):
+  - 종료 중 받은 요청이 QUEUED로 남음, Spring DEBUG 로그에 예외 메시지 → SPEC F2 알려진 한계에 기록
+  - 종료 중단 경로를 끝까지 잇는 테스트 없음, 테스트 간 DB 공유 → 아래 "위험과 확인할 것"에 후속으로 기록
+  - 작업자 스레드의 `Error`(OOM 등)가 스택을 stderr에 찍고 RUNNING에 남음 → W6 커밋 뒤 별도 커밋으로 고침(예외 클래스 이름만 남기고 작업은 `INTERNAL_ERROR`)
+- 진행 과정: W6 구현이 reviewer 없이 커밋 전 상태로 며칠 남아 있었음 (2026-10-12 상태 점검으로 확인)
 
 ### W7. 조회 API
 - `GET /api/jobs/{id}` → `{status, failure?, items?}` (발언 본문 없음), 조회 제한기(GET, 분당 120회), 404 통일, 요청·응답 toString에서 값 숨김
@@ -93,6 +109,8 @@
 - Ollama의 OpenAI 호환 엔드포인트가 `response_format` JSON 스키마를 받는지: 비교할 때 확인, 안 되면 한계로 기록
 - 덩어리 6,000자와 `-c 16384`가 노트북에서 5분 안에 끝나는지: 실측으로 조정
 - 주의할 점(W4 security-checker): `SummarizeService`는 실행기 오류(`LLM_ERROR`) 때 `LlmCallException` 메시지를 WARN 로그에 남긴다. 지금은 상태 코드만 담은 고정 문구지만, `OpenAiCompatibleLlmClient` 예외 메시지를 바꿀 때(응답 본문 추가 등) 로그 노출을 다시 확인한다
+- 후속(W6 reviewer): 종료 중단 경로(실행 중 작업 interrupt → LLM `INTERRUPTED` → `SERVER_RESTART` 저장)를 실제 `SummaryJobRunner`·`MemorySummaryQueue`로 끝까지 잇는 테스트가 없다. 지금은 단계별 테스트만 있다
+- 후속(W6 reviewer): 테스트 컨텍스트가 같은 메모리 DB(`DB_CLOSE_DELAY=-1`)를 함께 써서, 새 컨텍스트의 시작 복구가 다른 테스트의 QUEUED·RUNNING 작업까지 FAILED로 바꾼다. 앞 클래스가 남긴 작업을 확인하는 테스트나 병렬 실행을 추가하면 순서에 따라 깨질 수 있다. 대기열 테스트는 끝날 때 작업을 비우거나, 복구 테스트만 다른 DB 이름을 쓴다
 
 ## F2 완료 후
 - /docs-sync F2 (README 실행 명령 실측 반영, ARCHITECTURE에 llm 패키지와 정리 흐름 시퀀스)

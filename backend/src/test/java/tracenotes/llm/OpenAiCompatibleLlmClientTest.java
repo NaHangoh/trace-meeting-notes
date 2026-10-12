@@ -13,6 +13,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -165,6 +167,34 @@ class OpenAiCompatibleLlmClientTest {
         assertThatThrownBy(() -> client(baseUrl, Duration.ofMillis(200), false).complete(request()))
                 .isInstanceOfSatisfying(LlmCallException.class,
                         e -> assertThat(e.kind()).isEqualTo(LlmFailureKind.TIMEOUT));
+    }
+
+    /** 서버 종료로 작업자 스레드가 중단되면 타임아웃이 아니라 중단으로 본다 (SPEC F2: SERVER_RESTART). 중단 표시는 유지한다. */
+    @Test
+    void interruptedCallIsInterruptedFailure() throws Exception {
+        URI baseUrl = startServer(200, completion("{\"items\":[]}"), 5000);
+        OpenAiCompatibleLlmClient client = client(baseUrl, Duration.ofSeconds(30), false);
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        AtomicBoolean stillInterrupted = new AtomicBoolean();
+        Thread caller = new Thread(() -> {
+            try {
+                client.complete(request());
+            } catch (Throwable e) {
+                thrown.set(e);
+                stillInterrupted.set(Thread.currentThread().isInterrupted());
+            }
+        });
+        caller.start();
+        while (requests.isEmpty()) {
+            Thread.onSpinWait();
+        }
+
+        caller.interrupt();
+        caller.join(5000);
+
+        assertThat(thrown.get()).isInstanceOfSatisfying(LlmCallException.class,
+                e -> assertThat(e.kind()).isEqualTo(LlmFailureKind.INTERRUPTED));
+        assertThat(stillInterrupted).isTrue();
     }
 
     @Test
