@@ -187,6 +187,7 @@
 - 작업 상태를 바꾸는 DB 호출 자체가 실패하면 작업이 `RUNNING`에 남는다. 서버 재시작 시 복구 로직이 `FAILED`(`SERVER_RESTART`)로 바꾼다. 그 전까지는 다시 시도도 409다.
 - 서버 종료 중에 받은 작업 생성·다시 시도는 저장된 뒤 대기열이 받지 않아 500이 될 수 있다. 이때 작업은 `QUEUED`로 남고(생성이면 사용자는 작업 ID를 받지 못한다) 다음 시작 때 `FAILED`(`SERVER_RESTART`)가 되며, 보관 기간이 지나면 지워진다.
 - Spring의 DEBUG 로그(`org.springframework.web`)에는 처리하지 못한 예외 메시지가 남을 수 있다. 운영에서는 이 로거의 DEBUG를 켜지 않는다(기본 INFO).
+- Spring의 `DispatcherServlet`은 DEBUG에서 요청 URI를 로그에 남기고, URI에는 작업 ID(곧 열람 권한)가 들어간다. 그래서 설정에서 이 로거를 INFO로 고정해 `org.springframework.web`을 DEBUG로 켜도 요청 줄은 남지 않게 한다(설정 확인 테스트 있음).
 
 #### 범위 밖
 - Claude API 구현과 S4의 Claude 하루 호출 상한 (eval 비교 단계)

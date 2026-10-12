@@ -1,6 +1,7 @@
 package tracenotes.summary;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -30,6 +31,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tracenotes.TraceNotesApplication;
@@ -165,6 +167,34 @@ class SummaryJobFlowTest {
         awaitStatus(repository, second, JobStatus.DONE);
         assertThat(repository.findItems(first)).singleElement()
                 .isEqualTo(new SummaryItem(SummaryItemType.DECISION, "결정", List.of(1), null, null));
+    }
+
+    /** 조회 API로 본 상태 변화: 기다림·진행은 상태만, 완료는 상태와 항목만 (발언 본문 없음). */
+    @Test
+    void statusApiShowsQueuedRunningDone() throws Exception {
+        String first = createJob();
+        awaitStatus(repository, first, JobStatus.RUNNING);
+        String second = createJob();
+
+        mvc.perform(statusRequest(first))
+                .andExpect(content().json("{\"status\":\"RUNNING\"}", JsonCompareMode.STRICT));
+        mvc.perform(statusRequest(second))
+                .andExpect(content().json("{\"status\":\"QUEUED\"}", JsonCompareMode.STRICT));
+
+        release.countDown();
+        awaitStatus(repository, first, JobStatus.DONE);
+
+        String body = mvc.perform(statusRequest(first))
+                .andExpect(content().json("""
+                        {"status":"DONE","items":[
+                          {"type":"DECISION","text":"결정","evidence":[1],"assignee":null,"due":null}
+                        ]}""", JsonCompareMode.STRICT))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).doesNotContain("다음 주에 배포합니다").doesNotContain("참석자");
+    }
+
+    private static MockHttpServletRequestBuilder statusRequest(String jobId) {
+        return get("/api/jobs/" + jobId).with(r -> { r.setRemoteAddr(newIp()); return r; });
     }
 
     @Test

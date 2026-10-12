@@ -16,6 +16,12 @@ spring:
     console:
       enabled: false
 
+logging:
+  level:
+    # DispatcherServlet은 DEBUG에서 요청 URI를 남긴다. URI 속 작업 ID가 곧 열람 권한이라
+    # org.springframework.web을 DEBUG로 켜도 이 로거는 INFO로 둔다 (SPEC F2 알려진 한계)
+    org.springframework.web.servlet.DispatcherServlet: INFO
+
 app:
   # SPEC S3: 입력 최대 글자 수 (CRLF를 LF로 정규화한 뒤 코드 포인트 수)
   max-script-chars: 50000
@@ -26,6 +32,8 @@ app:
     preview-per-minute: 60
     # SPEC S4: 작업 생성 IP당 시간당 요청 수 (개발 프로필 200, application-dev.yml)
     job-per-hour: 20
+    # SPEC F2: 작업 조회 IP당 분당 요청 수 (화면이 2초마다 조회). 미리보기·작업 생성과 별도
+    status-per-minute: 120
   # SPEC S2: 작업·발언 보관 기간과 삭제 실행 간격
   retention: 24h
   retention-cleanup-interval: 10m

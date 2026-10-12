@@ -113,8 +113,10 @@ class PreviewControllerTest {
         assertThat(malformed.statusCode()).isEqualTo(400);
         assertThat(malformedAscii.statusCode()).isEqualTo(400);
         assertThat(output.getAll()).doesNotContain(ASCII_MARKER);
-        // DEBUG 로그가 실제로 켜져 있는지 확인해야 "남지 않음"이 의미가 있다
-        assertThat(output.getAll()).contains("/api/preview");
+        // DEBUG 로그가 실제로 켜져 있는지 확인해야 "남지 않음"이 의미가 있다 (요청 본문을 읽는 DEBUG 줄)
+        assertThat(output.getAll()).contains("Read \"application/json");
+        // DispatcherServlet은 INFO로 고정되어 요청 줄(URI)을 남기지 않는다 (SPEC F2 알려진 한계)
+        assertThat(output.getAll()).doesNotContain("\"/api/preview\"");
         assertThat(output.getAll()).doesNotContain(MARKER);
     }
 

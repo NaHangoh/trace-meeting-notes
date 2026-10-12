@@ -91,9 +91,16 @@
   - 작업자 스레드의 `Error`(OOM 등)가 스택을 stderr에 찍고 RUNNING에 남음 → W6 커밋 뒤 별도 커밋으로 고침(예외 클래스 이름만 남기고 작업은 `INTERNAL_ERROR`). 결과: `SummaryJobRunner`가 `Error`도 `INTERNAL_ERROR`로 저장한 뒤 다시 던지고, 작업자 스레드 처리기는 클래스 이름만 남김. 테스트 `errorDuringSummaryIsInternalErrorWithClassNameOnly`, `workerErrorLogsClassNameOnlyAndNextJobRuns`(수정 전 실패 확인). reviewer·security-checker 반영: Error 뒤 실패 저장까지 실패하면 Error에 가려져 "state not saved" 로그가 사라지던 문제(낮음), 테스트 `stateSaveFailureAfterErrorIsStillLogged`(수정 전 실패 확인). 백엔드 316개 통과
 - 진행 과정: W6 구현이 reviewer 없이 커밋 전 상태로 며칠 남아 있었음 (2026-10-12 상태 점검으로 확인)
 
-### W7. 조회 API
+### W7. 조회 API ✅ 완료
 - `GET /api/jobs/{id}` → `{status, failure?, items?}` (발언 본문 없음), 조회 제한기(GET, 분당 120회), 404 통일, 요청·응답 toString에서 값 숨김
 - 테스트: statusResponseHasNoUtteranceText, request121InSameMinuteReturns429(고정 시계), malformedUnknownAndDeletedIdSame404, statusPollingDoesNotCountTowardJobLimit, jobIdAndItemsNotInLogs
+- 결과: `GET /api/jobs/{id}`(`SummaryJobController`) → `SummaryStatusService` → `JobResult`. 응답 `JobStatusResponse`는 `failure`(FAILED만)·`items`(DONE만)가 없으면 키를 빼고, 항목은 `type, text, evidence, assignee, due`(assignee·due는 null로 나옴). 발언 테이블은 읽지 않음. 조회 제한기 `app.rate-limit.status-per-minute`(기본 120, 1 미만이면 시작 실패), GET·HEAD를 `/api/jobs/*`에서 셈(없는 ID도 셈). 형식이 틀린 ID도 따로 거르지 않고 같은 DB 조회로 404. toString은 개수·글자 수·있음/없음만. 백엔드 334개 통과
+- 형식이 틀린 ID 판단: 작업 ID는 늘 UUID라 형식이 틀린 ID는 존재할 수 없으므로, 바로 404로 돌려줘도 존재 여부는 드러나지 않는다(알 수 있는 건 공개된 형식뿐). 그래도 경로를 하나로 두어 응답·처리를 같게 함. 없는 ID와 삭제된 ID는 같은 쿼리. 매핑되지 않는 경로(`/api/jobs/`)는 다른 404 본문(`REQUEST_ERROR`)이지만 ID와 무관
+- 추가 테스트: queuedJobHasStatusOnly, failedJobHasStatusAndFailureOnly, eachJobReturnsOnlyItsOwnItems·neighbouringIdCannotReadAnotherJob(S1), unhandledStatusErrorDoesNotLogJobId, notFoundLookupsAlsoCount, headRequestsCountTowardStatusLimit, jobCreationRetryAndOptionsDoNotCountTowardStatusLimit, StatusRateLimitConfigTest, StatusResponseToStringTest 2개, RateLimitPropertiesTest 기본값·0 검사, SummaryJobFlowTest.statusApiShowsQueuedRunningDone
+- reviewer 반영: HEAD 요청이 조회 제한을 피함(중간, `@GetMapping`이 HEAD도 받음, 테스트 먼저 실패 확인), 삭제 경합 주석(낮음), API로 RUNNING 응답 확인(낮음)
+- test-verifier 반영: `jobIdAndItemsNotInLogs`가 전체 실행에서는 DEBUG가 꺼진 채 돌아 빈 검사였음(같은 설정의 컨텍스트를 공유하는 사이 다른 컨텍스트가 로그 레벨을 되돌림) → 테스트마다 `LoggingSystem`으로 DEBUG를 켜고 DEBUG 줄이 찍혔는지 먼저 확인. 조회 제한기가 설정값을 따르는지, 결과가 있던 DONE 작업 삭제 후 404, 두 작업 결과가 섞이지 않는지 추가
+- 결정(사용자, 2026-10-12): 실제 서버에서 `org.springframework.web` DEBUG를 켜면 DispatcherServlet이 요청 URI(작업 ID 포함)를 로그에 남긴다(MockMvc는 이 줄을 찍지 않음, 라이브러리 확인). `application.yml`에서 이 로거를 INFO로 고정하고 SPEC F2 알려진 한계에 기록. `DispatcherServletLogLevelTest`(설정이 빠지면 실패, 수정 전 실패 확인). 실제 서버로 도는 `PreviewControllerTest` 출력에서도 요청 줄이 사라진 것을 확인. 이 테스트가 DEBUG 증거로 쓰던 요청 줄 단언을 요청 본문 DEBUG 줄로 바꾸고 요청 줄 부재 단언을 추가(사용자 승인, 입력 본문 부재 단언은 그대로). 백엔드 335개 통과
+- 후속(test-verifier): `SummaryInternalErrorTest`도 같은 컨텍스트 공유로 DEBUG가 꺼진 채 돌 수 있다(ERROR 수준 단언은 유효). 고정 시계 테스트들은 IP 대역을 클래스마다 나눠 쓰는데 이 약속이 코드에 적혀 있지 않다
 
 ### W8. 프론트 상태 화면
 - `#/jobs/{id}` 해시 라우팅(새 의존성 없음), React Query `refetchInterval` 2초(DONE·FAILED에서 멈춤), 종류별 항목 목록, 근거 없음 표시, 실패 문구와 다시 시도, 입력 화면은 생성 성공 시 이동

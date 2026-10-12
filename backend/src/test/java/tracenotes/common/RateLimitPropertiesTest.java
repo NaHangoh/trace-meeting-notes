@@ -27,8 +27,27 @@ class RateLimitPropertiesTest {
                 .run(context -> assertThat(context.getBean(RateLimitProperties.class).jobPerHour()).isEqualTo(200));
     }
 
+    /** SPEC F2: 작업 조회 기본 분당 120회. 미리보기·작업 생성과 다른 설정값이다. */
+    @Test
+    void defaultStatusLimitIsSeparateSetting() {
+        runner.run(context -> {
+            RateLimitProperties properties = context.getBean(RateLimitProperties.class);
+            assertThat(properties.statusPerMinute()).isEqualTo(120);
+            assertThat(properties.previewPerMinute()).isEqualTo(60);
+        });
+        runner.withPropertyValues("app.rate-limit.status-per-minute=7")
+                .run(context -> {
+                    RateLimitProperties properties = context.getBean(RateLimitProperties.class);
+                    assertThat(properties.statusPerMinute()).isEqualTo(7);
+                    assertThat(properties.previewPerMinute()).isEqualTo(60);
+                    assertThat(properties.jobPerHour()).isEqualTo(20);
+                });
+    }
+
     @Test
     void nonPositiveLimitsFailStartup() {
+        runner.withPropertyValues("app.rate-limit.status-per-minute=0")
+                .run(context -> assertThat(context).hasFailed());
         runner.withPropertyValues("app.rate-limit.job-per-hour=0")
                 .run(context -> assertThat(context).hasFailed());
         runner.withPropertyValues("app.rate-limit.preview-per-minute=0")
