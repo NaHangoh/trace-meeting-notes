@@ -67,7 +67,7 @@
 - `job`에 status·failure 열, `summary_item`(작업·순번·종류·내용·담당자·기한), `summary_evidence`(항목·발언 번호). 모두 FK CASCADE. 표준 SQL만 (ADR 0005)
 - 테스트: v3MigrationApplies, statusTransitionsPersisted, resultsDeletedWithJobAfterRetention
 
-### W6. 대기열·작업자와 다시 시도 ✅ 완료
+### W6. 대기열·작업자와 다시 시도 ✅ 완료 (448a8eb)
 - `SummaryQueue` 인터페이스와 메모리 구현(작업자 수 `app.summary.workers` 기본 1, 상한 10), 작업 생성 시 자리를 먼저 확보한 뒤 저장(가득 차면 작업을 만들지 않음), 시작 시 `QUEUED`·`RUNNING` → `FAILED(SERVER_RESTART)`
 - 확장 경로(ADR 0007): 서버 여러 대는 DB 구현(`SELECT … FOR UPDATE SKIP LOCKED`)으로 교체, 요청 수 제한기는 Redis나 DB로
 - `POST /api/jobs/{id}/retry`: `FAILED`만(그 밖 409), 작업 생성과 같은 S4 제한기·대기열 상한
@@ -88,7 +88,7 @@
 - reviewer 낮음 5건, 결정(사용자, 2026-10-12):
   - 종료 중 받은 요청이 QUEUED로 남음, Spring DEBUG 로그에 예외 메시지 → SPEC F2 알려진 한계에 기록
   - 종료 중단 경로를 끝까지 잇는 테스트 없음, 테스트 간 DB 공유 → 아래 "위험과 확인할 것"에 후속으로 기록
-  - 작업자 스레드의 `Error`(OOM 등)가 스택을 stderr에 찍고 RUNNING에 남음 → W6 커밋 뒤 별도 커밋으로 고침(예외 클래스 이름만 남기고 작업은 `INTERNAL_ERROR`)
+  - 작업자 스레드의 `Error`(OOM 등)가 스택을 stderr에 찍고 RUNNING에 남음 → W6 커밋 뒤 별도 커밋으로 고침(예외 클래스 이름만 남기고 작업은 `INTERNAL_ERROR`). 결과: `SummaryJobRunner`가 `Error`도 `INTERNAL_ERROR`로 저장한 뒤 다시 던지고, 작업자 스레드 처리기는 클래스 이름만 남김. 테스트 `errorDuringSummaryIsInternalErrorWithClassNameOnly`, `workerErrorLogsClassNameOnlyAndNextJobRuns`(수정 전 실패 확인). reviewer·security-checker 반영: Error 뒤 실패 저장까지 실패하면 Error에 가려져 "state not saved" 로그가 사라지던 문제(낮음), 테스트 `stateSaveFailureAfterErrorIsStillLogged`(수정 전 실패 확인). 백엔드 316개 통과
 - 진행 과정: W6 구현이 reviewer 없이 커밋 전 상태로 며칠 남아 있었음 (2026-10-12 상태 점검으로 확인)
 
 ### W7. 조회 API
@@ -111,6 +111,7 @@
 - 주의할 점(W4 security-checker): `SummarizeService`는 실행기 오류(`LLM_ERROR`) 때 `LlmCallException` 메시지를 WARN 로그에 남긴다. 지금은 상태 코드만 담은 고정 문구지만, `OpenAiCompatibleLlmClient` 예외 메시지를 바꿀 때(응답 본문 추가 등) 로그 노출을 다시 확인한다
 - 후속(W6 reviewer): 종료 중단 경로(실행 중 작업 interrupt → LLM `INTERRUPTED` → `SERVER_RESTART` 저장)를 실제 `SummaryJobRunner`·`MemorySummaryQueue`로 끝까지 잇는 테스트가 없다. 지금은 단계별 테스트만 있다
 - 후속(W6 reviewer): 테스트 컨텍스트가 같은 메모리 DB(`DB_CLOSE_DELAY=-1`)를 함께 써서, 새 컨텍스트의 시작 복구가 다른 테스트의 QUEUED·RUNNING 작업까지 FAILED로 바꾼다. 앞 클래스가 남긴 작업을 확인하는 테스트나 병렬 실행을 추가하면 순서에 따라 깨질 수 있다. 대기열 테스트는 끝날 때 작업을 비우거나, 복구 테스트만 다른 DB 이름을 쓴다
+- 후속(작업자 Error 수정 reviewer, 낮음): `saveDone` 안에서 난 Error가 롤백 후 `FAILED(INTERNAL_ERROR)`가 되는지 실제 DB 테스트가 없다(지금은 mock으로 `summarize`에서 난 경우만). `markRunning`에서 난 Error는 실행기 try 밖이라 작업자 스레드 처리기 로그(클래스 이름만, 실패 종류 없음) 하나만 남고 작업은 RUNNING에 남는다(재시작 시 `SERVER_RESTART`)
 
 ## F2 완료 후
 - /docs-sync F2 (README 실행 명령 실측 반영, ARCHITECTURE에 llm 패키지와 정리 흐름 시퀀스)

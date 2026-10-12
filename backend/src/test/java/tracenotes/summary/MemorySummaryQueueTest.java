@@ -10,8 +10,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
-/** ADR 0007 메모리 대기열: 대기 자리 상한, 작업자 수, 종료 시 실행 중 작업 중단. */
+/** ADR 0007 메모리 대기열: 대기 자리 상한, 작업자 수, 종료 시 실행 중 작업 중단, 작업자 스레드의 Error. */
+@ExtendWith(OutputCaptureExtension.class)
 class MemorySummaryQueueTest {
 
     private final CountDownLatch release = new CountDownLatch(1);
@@ -107,5 +111,28 @@ class MemorySummaryQueueTest {
         queue.shutdown();
 
         assertThat(interrupted).containsExactly("running");
+    }
+
+    /** 작업자 스레드까지 올라온 Error는 예외 클래스 이름만 남기고(메시지·스택 없음), 작업자는 다음 작업을 계속 실행한다. */
+    @Test
+    void workerErrorLogsClassNameOnlyAndNextJobRuns(CapturedOutput output) throws Exception {
+        String marker = "workerErrorMarker";
+        queue = new MemorySummaryQueue(1, 10, jobId -> {
+            if (jobId.equals("fatal")) {
+                throw new StackOverflowError(marker);
+            }
+            blockingRunner.accept(jobId);
+        });
+
+        queue.reserve().submit("fatal");
+        queue.reserve().submit("next");
+
+        awaitStarted(1);
+        assertThat(started).containsExactly("next");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!output.getAll().contains("java.lang.StackOverflowError") && System.nanoTime() < deadline) {
+            Thread.sleep(5);
+        }
+        assertThat(output).contains("java.lang.StackOverflowError").doesNotContain(marker, "\tat ");
     }
 }

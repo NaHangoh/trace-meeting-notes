@@ -36,6 +36,9 @@ public class MemorySummaryQueue implements SummaryQueue {
         return task -> {
             Thread thread = new Thread(task, "summary-worker-" + next.incrementAndGet());
             thread.setDaemon(true);
+            // 기본 처리기는 메시지와 스택을 stderr에 찍는다. 메시지에 작업 ID·SQL이 들어갈 수 있어 클래스 이름만 남긴다.
+            // 스레드는 끝나고 실행기가 새 작업자를 만든다
+            thread.setUncaughtExceptionHandler((t, e) -> log.error("summary worker stopped ({})", e.getClass().getName()));
             return thread;
         };
     }

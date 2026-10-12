@@ -8,7 +8,7 @@ import tracenotes.minutes.JobRepository;
 
 /**
  * 작업자가 실행하는 정리 작업 하나 (SPEC F2): QUEUED → RUNNING → DONE 또는 FAILED.
- * 예상 밖 예외는 FAILED(INTERNAL_ERROR)로 남기고 자동으로 다시 실행하지 않는다.
+ * 예상 밖 예외와 Error는 FAILED(INTERNAL_ERROR)로 남기고 자동으로 다시 실행하지 않는다.
  * 예외 메시지에는 SQL과 작업 ID가 들어갈 수 있으므로 로그에는 실패 종류와 예외 클래스 이름만 남긴다 (스택 없음).
  */
 public class SummaryJobRunner implements Consumer<String> {
@@ -41,6 +41,7 @@ public class SummaryJobRunner implements Consumer<String> {
             return;
         }
         SummaryFailure failure;
+        Error fatal = null;
         try {
             List<SummaryItem> items = summarizer.summarize(jobs.findUtterances(jobId));
             withoutInterrupt(() -> repository.saveDone(jobId, items));
@@ -48,12 +49,26 @@ public class SummaryJobRunner implements Consumer<String> {
         } catch (SummaryFailedException e) {
             // SummarizeService가 실패 종류와 재시도 횟수를 이미 로그에 남겼다
             failure = e.reason();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | Error e) {
             failure = SummaryFailure.INTERNAL_ERROR;
             log.error("summary failed: {} ({})", failure, e.getClass().getName());
+            if (e instanceof Error error) {
+                fatal = error;
+            }
         }
         SummaryFailure reason = failure;
-        withoutInterrupt(() -> repository.markFailed(jobId, reason));
+        if (fatal == null) {
+            withoutInterrupt(() -> repository.markFailed(jobId, reason));
+            return;
+        }
+        // Error(OOM 등)는 상태를 남긴 뒤 작업자 스레드로 다시 던진다. 스레드 처리기가 클래스 이름만 남긴다 (MemorySummaryQueue).
+        // 상태 저장까지 실패하면 Error에 가려지지 않게 여기서 남긴다
+        try {
+            withoutInterrupt(() -> repository.markFailed(jobId, reason));
+        } catch (RuntimeException e) {
+            log.error("summary job state not saved ({})", e.getClass().getName());
+        }
+        throw fatal;
     }
 
     /**
