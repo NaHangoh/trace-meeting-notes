@@ -91,7 +91,7 @@
   - 작업자 스레드의 `Error`(OOM 등)가 스택을 stderr에 찍고 RUNNING에 남음 → W6 커밋 뒤 별도 커밋으로 고침(예외 클래스 이름만 남기고 작업은 `INTERNAL_ERROR`). 결과: `SummaryJobRunner`가 `Error`도 `INTERNAL_ERROR`로 저장한 뒤 다시 던지고, 작업자 스레드 처리기는 클래스 이름만 남김. 테스트 `errorDuringSummaryIsInternalErrorWithClassNameOnly`, `workerErrorLogsClassNameOnlyAndNextJobRuns`(수정 전 실패 확인). reviewer·security-checker 반영: Error 뒤 실패 저장까지 실패하면 Error에 가려져 "state not saved" 로그가 사라지던 문제(낮음), 테스트 `stateSaveFailureAfterErrorIsStillLogged`(수정 전 실패 확인). 백엔드 316개 통과
 - 진행 과정: W6 구현이 reviewer 없이 커밋 전 상태로 며칠 남아 있었음 (2026-10-12 상태 점검으로 확인)
 
-### W7. 조회 API ✅ 완료
+### W7. 조회 API ✅ 완료 (b8d2d5c)
 - `GET /api/jobs/{id}` → `{status, failure?, items?}` (발언 본문 없음), 조회 제한기(GET, 분당 120회), 404 통일, 요청·응답 toString에서 값 숨김
 - 테스트: statusResponseHasNoUtteranceText, request121InSameMinuteReturns429(고정 시계), malformedUnknownAndDeletedIdSame404, statusPollingDoesNotCountTowardJobLimit, jobIdAndItemsNotInLogs
 - 결과: `GET /api/jobs/{id}`(`SummaryJobController`) → `SummaryStatusService` → `JobResult`. 응답 `JobStatusResponse`는 `failure`(FAILED만)·`items`(DONE만)가 없으면 키를 빼고, 항목은 `type, text, evidence, assignee, due`(assignee·due는 null로 나옴). 발언 테이블은 읽지 않음. 조회 제한기 `app.rate-limit.status-per-minute`(기본 120, 1 미만이면 시작 실패), GET·HEAD를 `/api/jobs/*`에서 셈(없는 ID도 셈). 형식이 틀린 ID도 따로 거르지 않고 같은 DB 조회로 404. toString은 개수·글자 수·있음/없음만. 백엔드 334개 통과
@@ -102,9 +102,16 @@
 - 결정(사용자, 2026-10-12): 실제 서버에서 `org.springframework.web` DEBUG를 켜면 DispatcherServlet이 요청 URI(작업 ID 포함)를 로그에 남긴다(MockMvc는 이 줄을 찍지 않음, 라이브러리 확인). `application.yml`에서 이 로거를 INFO로 고정하고 SPEC F2 알려진 한계에 기록. `DispatcherServletLogLevelTest`(설정이 빠지면 실패, 수정 전 실패 확인). 실제 서버로 도는 `PreviewControllerTest` 출력에서도 요청 줄이 사라진 것을 확인. 이 테스트가 DEBUG 증거로 쓰던 요청 줄 단언을 요청 본문 DEBUG 줄로 바꾸고 요청 줄 부재 단언을 추가(사용자 승인, 입력 본문 부재 단언은 그대로). 백엔드 335개 통과
 - 후속(test-verifier): `SummaryInternalErrorTest`도 같은 컨텍스트 공유로 DEBUG가 꺼진 채 돌 수 있다(ERROR 수준 단언은 유효). 고정 시계 테스트들은 IP 대역을 클래스마다 나눠 쓰는데 이 약속이 코드에 적혀 있지 않다
 
-### W8. 프론트 상태 화면
+### W8. 프론트 상태 화면 ✅ 완료
 - `#/jobs/{id}` 해시 라우팅(새 의존성 없음), React Query `refetchInterval` 2초(DONE·FAILED에서 멈춤), 종류별 항목 목록, 근거 없음 표시, 실패 문구와 다시 시도, 입력 화면은 생성 성공 시 이동
 - 테스트(가짜 타이머, fireEvent): showsQueuedRunningDoneFailedWithIconAndText, stopsPollingWhenDoneOrFailed, rendersItemsAndSpeakerAsPlainText(`<script>` 포함), unsupportedItemShowsIconAndText, retryButtonOnFailure, queueFullAndRateLimitMessagesDiffer, navigatesToJobAfterCreation, unknownJobShowsNotFound
+- 결과: `route.ts`(`useSyncExternalStore` + `hashchange`, `#/jobs/` 뒤가 UUID 형식이 아니면 서버에 묻지 않고 404 문구), `features/job/`(`useJobStatus`, `JobStatusPage`, 고정 문구 `messages.ts`), `api/client.ts`에 `fetchJobStatus`·`retryJob`(응답 형식을 엄격히 검사하고 틀리면 그리지 않음)와 오류 코드 `QUEUE_FULL`·`NOT_FOUND`·`NOT_RETRYABLE`. 429는 본문 code가 `QUEUE_FULL`일 때만 대기열 문구. 프론트 65개 통과, 타입 검사·빌드 통과. 의존성·잠금 파일 변경 없음
+- 결정(해석): 조회가 429가 아닌 오류(500, 형식 오류)여도 오류 화면으로 바꾸지 않고 마지막 상태를 유지한 채 간격을 늘림(2초 × 2^연속 실패, 상한 30초), 404만 멈춤. 할 일의 담당자·기한은 null이면 줄 자체를 그리지 않음. 다시 시도가 409·404면 상태를 다시 조회
+- 가짜 타이머: setInterval만 가짜로 바꾼다. setTimeout까지 바꾸면 React Query가 구독자에게 결과를 넘기는 0ms 차례가 멈춰 화면이 다시 그려지지 않음(확인함). 테스트 이름 `rendersItemsAndSpeakerAsPlainText`는 화면에 화자가 없어 `rendersItemFieldsAsPlainText`로 바꿈(화자는 F1 테스트)
+- 추가 테스트: rateLimitedPollingKeepsLastStateAndBacksOff, backoffIsCappedAt30Seconds, rateLimitedFirstLookupShowsCheckingNotError, jobDeletedWhilePollingShowsNotFound, groupsItemsByType, todoShowsAssigneeAndDueOnlyWhenPresent, failureReasonsHaveFixedMessages, retryConflictRefreshesStatus, jobIdNotInTitleOrText, malformedResponseIsNotRendered, App 해시 테스트 3개, ScriptInputPage.jobCreationQueueFullShowsDifferentMessage(구현 뒤에 써서 먼저 실패를 확인하지 못함)
+- reviewer·test-verifier 반영(낮음): 다시 시도 404 경로(`retryNotFoundShowsNotFoundAndStopsPolling`), 다시 그려지기 전 연속 클릭(`rapidDoubleRetryClickSendsOneRequest`), 다시 시도 버튼은 FAILED에서만(`retryButtonOnlyWhenFailed`), 리퍼러 meta와 외부 스크립트 없음(`indexHtmlSendsNoReferrerAndLoadsNoExternalScript`), 기한만 있는 할 일·할 일 아닌 항목의 담당자, FAILED·404·오류 상태의 작업 ID 부재. 앞의 셋은 해당 코드를 잠시 빼서 실패를 확인함. jsdom은 스크립트를 실행하지 않아 `window.injected` 단언은 빈 검사(요소 검사가 실제 확인, 주석으로 적음)
+- 결정(사용자, 2026-10-12): 조회 간격 2초는 코드 상수(`POLL_INTERVAL_MS`)로 두고 SPEC F2 문구를 "2초마다(프론트 상수)"로 고침. 500·형식 오류도 마지막 상태 유지와 간격 늘리기는 그대로 하되 문구를 429와 구분("일시적인 오류로 잠시 뒤에 다시 확인합니다."), 테스트 `transientErrorKeepsLastStateWithDifferentMessageFromRateLimit`(수정 전 실패 확인). 담당자·기한이 없으면 줄을 그리지 않음 확정. 프론트 66개 통과
+- 브라우저 수동 확인은 사용자가 커밋 뒤에 함
 
 ### W9. eval 준비
 - `eval/cases/`에 가상 회의 `script.txt` 초안과 인젝션 케이스. `expected.json`·`planted.json`은 사용자가 작성(훅이 AI 수정을 막음)

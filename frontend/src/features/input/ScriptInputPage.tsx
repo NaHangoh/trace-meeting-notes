@@ -25,8 +25,10 @@ function errorCodeOf(error: unknown): ApiErrorCode {
 /**
  * 입력 화면 (SPEC F1). 붙여 넣거나 txt 파일을 열고, 500ms 디바운스 미리보기로 요약 한 줄을 보여준 뒤 작업을 만든다.
  * 입력·화자 이름·안내 문구는 모두 일반 텍스트로 렌더링한다 (SPEC S6).
+ *
+ * @param onJobCreated 작업을 만든 뒤 부른다 (상태 화면으로 이동, SPEC F2)
  */
-export function ScriptInputPage() {
+export function ScriptInputPage({ onJobCreated }: { onJobCreated?: (jobId: string) => void } = {}) {
   const [text, setText] = useState('')
   const [fileError, setFileError] = useState<string | null>(null)
   const lastPick = useRef(0)
@@ -42,6 +44,7 @@ export function ScriptInputPage() {
   const jobInFlight = useRef(false)
   const job = useMutation({
     mutationFn: createJob,
+    onSuccess: ({ jobId }) => onJobCreated?.(jobId),
     onSettled: () => {
       jobInFlight.current = false
     },

@@ -292,6 +292,20 @@ describe('ScriptInputPage', () => {
     expect(JSON.parse(String(jobCall?.[1]?.body))).toEqual({ text: '김민수: 네' })
   })
 
+  /** 대기열이 가득 차서 거부되면(429 QUEUE_FULL) 요청 수 제한과 다른 문구로 안내한다 (ADR 0007). */
+  it('jobCreationQueueFullShowsDifferentMessage', async () => {
+    jobReplies.push({ status: 429, body: { code: 'QUEUE_FULL', message: '서버 문구' } })
+    renderPage()
+
+    typeText('김민수: 네')
+    fireEvent.click(startButton())
+    await advance(0)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('대기 중인 정리 작업이 많습니다. 잠시 후 다시 시도하세요.')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('요청이 많습니다.')
+    expect(screen.queryByText(/서버 문구/)).not.toBeInTheDocument()
+  })
+
   /** 오류 응답 본문은 화면에 그대로 쓰지 않고 오류 코드별 고정 문구로 안내한다. */
   it('jobCreationErrorShowsFixedMessageNotResponseBody', async () => {
     jobReplies.push({ status: 400, body: { code: 'TOO_LONG', message: '서버가 보낸 문구 <b>x</b>' } })

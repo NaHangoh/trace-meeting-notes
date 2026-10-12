@@ -37,6 +37,12 @@ export function apiErrorMessage(code: ApiErrorCode): string {
       return '입력이 너무 큽니다.'
     case 'TOO_MANY_REQUESTS':
       return '요청이 많습니다. 잠시 후 다시 시도하세요.'
+    case 'QUEUE_FULL':
+      return '대기 중인 정리 작업이 많습니다. 잠시 후 다시 시도하세요.'
+    case 'NOT_FOUND':
+      return '작업이 없거나 보관 기간이 지나 삭제되었습니다.'
+    case 'NOT_RETRYABLE':
+      return '실패한 작업만 다시 시도할 수 있습니다.'
     case 'UNKNOWN':
       return '요청을 처리하지 못했습니다. 잠시 후 다시 시도하세요.'
   }
