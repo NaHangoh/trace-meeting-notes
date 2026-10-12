@@ -81,7 +81,7 @@ class OpenAiCompatibleLlmClientTest {
 
     private OpenAiCompatibleLlmClient client(URI baseUrl, Duration timeout, boolean disableThinking) {
         LlmProperties properties = new LlmProperties(LlmProvider.OPENAI_COMPATIBLE, baseUrl, "test-model",
-                FAKE_KEY, timeout, Duration.ofSeconds(10), disableThinking);
+                FAKE_KEY, timeout, Duration.ofSeconds(10), disableThinking, null, null);
         return new OpenAiCompatibleLlmClient(properties, json);
     }
 
@@ -120,6 +120,22 @@ class OpenAiCompatibleLlmClientTest {
         assertThat(body.path("messages").get(0).path("content").asString()).isEqualTo("시스템 지시");
         assertThat(body.path("messages").get(1).path("role").asString()).isEqualTo("user");
         assertThat(body.path("messages").get(1).path("content").asString()).isEqualTo("사용자 내용");
+    }
+
+    /** 샘플링은 설정값(app.llm.temperature, app.llm.seed)으로 고정해 요청마다 보낸다 (ADR 0002). */
+    @Test
+    void requestHasTemperatureAndSeedFromSettings() throws Exception {
+        URI baseUrl = startServer(200, completion("{\"items\":[]}"), 0);
+        LlmProperties properties = new LlmProperties(LlmProvider.OPENAI_COMPATIBLE, baseUrl, "test-model",
+                FAKE_KEY, Duration.ofSeconds(5), Duration.ofSeconds(10), false, 0.35, 7L);
+
+        new OpenAiCompatibleLlmClient(properties, json).complete(request());
+
+        JsonNode body = json.readTree(requests.get(0).body());
+        assertThat(body.path("temperature").isNumber()).isTrue();
+        assertThat(body.path("temperature").asDouble()).isEqualTo(0.35);
+        assertThat(body.path("seed").isIntegralNumber()).isTrue();
+        assertThat(body.path("seed").asLong()).isEqualTo(7L);
     }
 
     @Test

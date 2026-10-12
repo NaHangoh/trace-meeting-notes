@@ -14,15 +14,32 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param timeout 호출 하나의 타임아웃. 기본 5분
  * @param connectTimeout 실행기에 연결하는 타임아웃. 기본 10초. 넘으면 연결 실패로 본다
  * @param disableThinking 요청에 chat_template_kwargs.enable_thinking=false를 넣을지 (Qwen3 생각 모드 끄기)
+ * @param temperature 샘플링 temperature. 0~2, 기본 0.2 (ADR 0002)
+ * @param seed 샘플링 seed. 0 이상, 기본 42. 실행기의 -1(무작위)은 받지 않는다 (ADR 0002)
  */
 @ConfigurationProperties("app.llm")
 public record LlmProperties(LlmProvider provider, URI baseUrl, String model, String apiKey, Duration timeout,
-        Duration connectTimeout, boolean disableThinking) {
+        Duration connectTimeout, boolean disableThinking, Double temperature, Long seed) {
 
     public static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(5);
     public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    public static final double DEFAULT_TEMPERATURE = 0.2;
+    public static final long DEFAULT_SEED = 42;
+    static final double MAX_TEMPERATURE = 2.0;
 
     public LlmProperties {
+        if (temperature == null) {
+            temperature = DEFAULT_TEMPERATURE;
+        }
+        if (seed == null) {
+            seed = DEFAULT_SEED;
+        }
+        if (!(temperature >= 0 && temperature <= MAX_TEMPERATURE)) {
+            throw new IllegalArgumentException("app.llm.temperature must be between 0 and 2");
+        }
+        if (seed < 0) {
+            throw new IllegalArgumentException("app.llm.seed must be 0 or greater");
+        }
         if (provider == null) {
             provider = LlmProvider.OPENAI_COMPATIBLE;
         }
@@ -62,6 +79,6 @@ public record LlmProperties(LlmProvider provider, URI baseUrl, String model, Str
         return "LlmProperties[provider=" + provider + ", baseUrl=" + baseUrl + ", model=" + model
                 + ", apiKey=" + (apiKey == null || apiKey.isBlank() ? "(none)" : "(set)")
                 + ", timeout=" + timeout + ", connectTimeout=" + connectTimeout
-                + ", disableThinking=" + disableThinking + "]";
+                + ", disableThinking=" + disableThinking + ", temperature=" + temperature + ", seed=" + seed + "]";
     }
 }

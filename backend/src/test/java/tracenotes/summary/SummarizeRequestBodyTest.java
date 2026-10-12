@@ -60,7 +60,7 @@ class SummarizeRequestBodyTest {
         URI baseUrl = startServer();
         OpenAiCompatibleLlmClient client = new OpenAiCompatibleLlmClient(new LlmProperties(
                 LlmProvider.OPENAI_COMPATIBLE, baseUrl, "test-model", FAKE_KEY, Duration.ofSeconds(5),
-                Duration.ofSeconds(5), true), json);
+                Duration.ofSeconds(5), true, null, null), json);
         SummarizeService service = new SummarizeService(client,
                 new SummaryPromptBuilder(new PromptLoader().summarizeTemplate("v2")),
                 new SummaryValidator(json), new ScriptChunker(100));

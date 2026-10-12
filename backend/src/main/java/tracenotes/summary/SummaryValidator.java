@@ -19,6 +19,7 @@ import tracenotes.minutes.Whitespace;
  * - 근거 번호는 덩어리에 실제로 있는 발언 번호만 남긴다. 남은 근거가 없으면 "근거 없음"
  * - 담당자·기한은 TODO에만, 공백을 뺀 2자 이상인 표현만 확인한다(공백 정규화 후).
  *   담당자는 근거 발언 화자 이름과 전체 일치 또는 근거 발언 내용에 부분 일치, 기한은 근거 발언 내용에 부분 일치할 때만 남긴다
+ * - 지운 것은 종류별 개수로 센다({@link SummaryValidation.Removed}). 모델이 값을 안 낸 것과 검증이 지운 것을 구분하려고
  */
 public class SummaryValidator {
 
@@ -34,21 +35,39 @@ public class SummaryValidator {
         this.json = json;
     }
 
-    public List<SummaryItem> validate(String output, List<Utterance> chunk) {
+    /** 남긴 항목과, 지운 것의 종류별 개수. */
+    public SummaryValidation check(String output, List<Utterance> chunk) {
         JsonNode items = itemsOf(output);
         Map<Integer, List<Utterance>> byNumber = chunk.stream()
                 .collect(Collectors.groupingBy(Utterance::no));
+        Counts removed = new Counts();
         List<SummaryItem> result = new ArrayList<>();
         for (JsonNode node : items) {
-            if (result.size() == MAX_ITEMS) {
-                break;
-            }
-            SummaryItem item = item(node, byNumber);
-            if (item != null) {
+            SummaryItem item = result.size() == MAX_ITEMS ? null : item(node, byNumber, removed);
+            if (item == null) {
+                removed.items++;
+            } else {
                 result.add(item);
             }
         }
-        return result;
+        return new SummaryValidation(result, removed.toRemoved());
+    }
+
+    public List<SummaryItem> validate(String output, List<Utterance> chunk) {
+        return check(output, chunk).items();
+    }
+
+    /** 지운 개수. 버린 항목 안의 근거·담당자·기한은 따로 세지 않는다. */
+    private static final class Counts {
+
+        int items;
+        int evidence;
+        int assignee;
+        int due;
+
+        SummaryValidation.Removed toRemoved() {
+            return new SummaryValidation.Removed(items, evidence, assignee, due);
+        }
     }
 
     private JsonNode itemsOf(String output) {
@@ -65,7 +84,7 @@ public class SummaryValidator {
     }
 
     /** 버릴 항목이면 null. */
-    private static SummaryItem item(JsonNode node, Map<Integer, List<Utterance>> byNumber) {
+    private static SummaryItem item(JsonNode node, Map<Integer, List<Utterance>> byNumber, Counts removed) {
         if (!node.isObject()) {
             return null;
         }
@@ -78,7 +97,7 @@ public class SummaryValidator {
         if (Whitespace.isBlank(text) || text.codePointCount(0, text.length()) > MAX_TEXT_LENGTH) {
             return null;
         }
-        List<Integer> evidence = evidence(node.path("evidence"), byNumber);
+        List<Integer> evidence = evidence(node.path("evidence"), byNumber, removed);
         String assignee = null;
         String due = null;
         if (type == SummaryItemType.TODO) {
@@ -86,7 +105,18 @@ public class SummaryValidator {
             assignee = assignee(node.path("assignee"), sources);
             due = due(node.path("due"), sources);
         }
+        // 값이 왔는데 비웠으면 센다 (TODO가 아닌 항목의 값 포함, null로 온 값은 세지 않음)
+        if (assignee == null && provided(node.path("assignee"))) {
+            removed.assignee++;
+        }
+        if (due == null && provided(node.path("due"))) {
+            removed.due++;
+        }
         return new SummaryItem(type, text, evidence, assignee, due);
+    }
+
+    private static boolean provided(JsonNode node) {
+        return !node.isMissingNode() && !node.isNull();
     }
 
     private static SummaryItemType type(JsonNode node) {
@@ -101,15 +131,21 @@ public class SummaryValidator {
         return null;
     }
 
-    /** 정수이고 덩어리에 있는 번호만, 처음 나온 순서로, 중복 없이. */
-    private static List<Integer> evidence(JsonNode node, Map<Integer, List<Utterance>> byNumber) {
+    /** 정수이고 덩어리에 있는 번호만, 처음 나온 순서로, 중복 없이. 버린 번호(배열 원소)를 센다. */
+    private static List<Integer> evidence(JsonNode node, Map<Integer, List<Utterance>> byNumber, Counts removed) {
         if (!node.isArray()) {
+            // 배열이 아닌 값이 왔으면 버린 근거 1개로 센다 (null·필드 없음은 세지 않음)
+            if (provided(node)) {
+                removed.evidence++;
+            }
             return List.of();
         }
         Set<Integer> numbers = new LinkedHashSet<>();
         for (JsonNode number : node) {
-            if (number.isIntegralNumber() && number.canConvertToInt() && byNumber.containsKey(number.asInt())) {
-                numbers.add(number.asInt());
+            boolean kept = number.isIntegralNumber() && number.canConvertToInt()
+                    && byNumber.containsKey(number.asInt()) && numbers.add(number.asInt());
+            if (!kept) {
+                removed.evidence++;
             }
         }
         return List.copyOf(numbers);

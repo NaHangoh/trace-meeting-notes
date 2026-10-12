@@ -102,7 +102,7 @@
 - 결정(사용자, 2026-10-12): 실제 서버에서 `org.springframework.web` DEBUG를 켜면 DispatcherServlet이 요청 URI(작업 ID 포함)를 로그에 남긴다(MockMvc는 이 줄을 찍지 않음, 라이브러리 확인). `application.yml`에서 이 로거를 INFO로 고정하고 SPEC F2 알려진 한계에 기록. `DispatcherServletLogLevelTest`(설정이 빠지면 실패, 수정 전 실패 확인). 실제 서버로 도는 `PreviewControllerTest` 출력에서도 요청 줄이 사라진 것을 확인. 이 테스트가 DEBUG 증거로 쓰던 요청 줄 단언을 요청 본문 DEBUG 줄로 바꾸고 요청 줄 부재 단언을 추가(사용자 승인, 입력 본문 부재 단언은 그대로). 백엔드 335개 통과
 - 후속(test-verifier): `SummaryInternalErrorTest`도 같은 컨텍스트 공유로 DEBUG가 꺼진 채 돌 수 있다(ERROR 수준 단언은 유효). 고정 시계 테스트들은 IP 대역을 클래스마다 나눠 쓰는데 이 약속이 코드에 적혀 있지 않다
 
-### W8. 프론트 상태 화면 ✅ 완료
+### W8. 프론트 상태 화면 ✅ 완료 (00072b1)
 - `#/jobs/{id}` 해시 라우팅(새 의존성 없음), React Query `refetchInterval` 2초(DONE·FAILED에서 멈춤), 종류별 항목 목록, 근거 없음 표시, 실패 문구와 다시 시도, 입력 화면은 생성 성공 시 이동
 - 테스트(가짜 타이머, fireEvent): showsQueuedRunningDoneFailedWithIconAndText, stopsPollingWhenDoneOrFailed, rendersItemsAndSpeakerAsPlainText(`<script>` 포함), unsupportedItemShowsIconAndText, retryButtonOnFailure, queueFullAndRateLimitMessagesDiffer, navigatesToJobAfterCreation, unknownJobShowsNotFound
 - 결과: `route.ts`(`useSyncExternalStore` + `hashchange`, `#/jobs/` 뒤가 UUID 형식이 아니면 서버에 묻지 않고 404 문구), `features/job/`(`useJobStatus`, `JobStatusPage`, 고정 문구 `messages.ts`), `api/client.ts`에 `fetchJobStatus`·`retryJob`(응답 형식을 엄격히 검사하고 틀리면 그리지 않음)와 오류 코드 `QUEUE_FULL`·`NOT_FOUND`·`NOT_RETRYABLE`. 429는 본문 code가 `QUEUE_FULL`일 때만 대기열 문구. 프론트 65개 통과, 타입 검사·빌드 통과. 의존성·잠금 파일 변경 없음
@@ -111,7 +111,18 @@
 - 추가 테스트: rateLimitedPollingKeepsLastStateAndBacksOff, backoffIsCappedAt30Seconds, rateLimitedFirstLookupShowsCheckingNotError, jobDeletedWhilePollingShowsNotFound, groupsItemsByType, todoShowsAssigneeAndDueOnlyWhenPresent, failureReasonsHaveFixedMessages, retryConflictRefreshesStatus, jobIdNotInTitleOrText, malformedResponseIsNotRendered, App 해시 테스트 3개, ScriptInputPage.jobCreationQueueFullShowsDifferentMessage(구현 뒤에 써서 먼저 실패를 확인하지 못함)
 - reviewer·test-verifier 반영(낮음): 다시 시도 404 경로(`retryNotFoundShowsNotFoundAndStopsPolling`), 다시 그려지기 전 연속 클릭(`rapidDoubleRetryClickSendsOneRequest`), 다시 시도 버튼은 FAILED에서만(`retryButtonOnlyWhenFailed`), 리퍼러 meta와 외부 스크립트 없음(`indexHtmlSendsNoReferrerAndLoadsNoExternalScript`), 기한만 있는 할 일·할 일 아닌 항목의 담당자, FAILED·404·오류 상태의 작업 ID 부재. 앞의 셋은 해당 코드를 잠시 빼서 실패를 확인함. jsdom은 스크립트를 실행하지 않아 `window.injected` 단언은 빈 검사(요소 검사가 실제 확인, 주석으로 적음)
 - 결정(사용자, 2026-10-12): 조회 간격 2초는 코드 상수(`POLL_INTERVAL_MS`)로 두고 SPEC F2 문구를 "2초마다(프론트 상수)"로 고침. 500·형식 오류도 마지막 상태 유지와 간격 늘리기는 그대로 하되 문구를 429와 구분("일시적인 오류로 잠시 뒤에 다시 확인합니다."), 테스트 `transientErrorKeepsLastStateWithDifferentMessageFromRateLimit`(수정 전 실패 확인). 담당자·기한이 없으면 줄을 그리지 않음 확정. 프론트 66개 통과
-- 브라우저 수동 확인은 사용자가 커밋 뒤에 함
+- 브라우저 수동 확인(사용자, 2026-10-12, 실제 Qwen3-8B): 흐름(대기 → 진행 → 완료), 실패와 다시 시도, 404, `<script>`가 든 발언의 일반 텍스트 표시 모두 정상. 같은 확인에서 정리 품질 문제 3건(결정 사항에 결정 내용 빠짐, 할 일 기한 비어 있음, 안건 없음)을 발견. 원인 분석 후 v3 여부는 W9 eval 기준선을 잡은 뒤 정함
+- 원인 분석(2026-10-12, 스크립트 A 1회 실제 호출, 응답은 저장소 밖에만 저장): 이번 호출에서는 검증기가 지운 것 없음(검증 전후 같음). 디자인 시안 일을 모델이 DISCUSSION으로 분류해 기한이 처음부터 null. 요청에 temperature·seed가 없어 실행마다 결과가 달라, 사용자 실행에서 기한이 빈 원인(모델 null인지 검증기 삭제인지)은 확정 못 함 → 아래 W8b로 샘플링 고정과 제거 개수 기록. 결정 내용 빠짐·안건 없음은 프롬프트 v2 문제(결정된 값을 text에 쓰라는 규칙 없음, 안건 필수 아님)로 보고 W9 기준선 뒤 v3 여부 결정
+
+### W8a. 쓰지 않는 JPA 제거 ✅ 완료 (ffa1bdf)
+- W0 골격의 `starter-data-jpa`를 `starter-jdbc`(테스트 `starter-jdbc-test`)로 교체, `spring.jpa` 설정 삭제, `hibernateDoesNotRunDdl`을 `noJpaSoOnlyFlywayChangesSchema`로 교체(교체 전 실패 확인), ADR 0005 변경 기록. 백엔드 335개 통과, bootRun 시작 로그에 JPA·Hibernate 줄 0개
+
+### W8b. 샘플링 고정과 검증 제거 개수 기록 (진행 중, 커밋 대기)
+- 남은 일: security-checker → 사용자 커밋 (`feat(summary): 샘플링 고정과 검증 제거 개수 기록`, W8 기록·해시, W8a 기록과 함께)
+- 요청에 `temperature`(`app.llm.temperature`, 기본 0.2, 0~2, NaN 거부)와 `seed`(`app.llm.seed`, 기본 42, 0 이상)를 넣음. 범위 밖이면 시작 실패. 기본값과 이유는 ADR 0002
+- `SummaryValidator.check` → `SummaryValidation(items, removed)`. 지운 개수: 항목(알 수 없는 종류·비었거나 500자 넘는 text·객체 아님·100개 초과), 근거 번호(정수 아님·덩어리 밖·중복, 배열이 아닌 값은 1개), 담당자·기한(값이 왔는데 비움, TODO가 아닌 항목의 값 포함). 버린 항목 안의 값, null로 오거나 필드가 없는 값은 세지 않음. `SummarizeService`가 덩어리마다 `summary chunk i/n removed items= evidence= assignee= due=`로 개수만 로그
+- 테스트: requestHasTemperatureAndSeedFromSettings(가짜 서버), defaultTemperatureAndSeed, temperatureAndSeedFromSettings, temperatureOrSeedOutOfRangeFailsStartup, countsRemovedByKind, nothingRemovedIsAllZero, itemsOverLimitAreCountedAsRemoved, validationToStringHasCountsOnly, logsRemovedCountsWithoutContent. 처음 9개 중 6개는 골격(필드·타입만) 상태에서 실패 확인, 나머지 3개(0 개수, toString, 설정 바인딩)는 골격에서도 통과
+- reviewer·test-verifier 반영(낮음): 버린 항목·넘친 항목 안의 무효 값이 세어지지 않는지 단언 추가, 근거가 배열이 아닌 값이면 1개로 셈(`nonArrayEvidenceCountsAsOneRemoved`, 수정 전 실패 확인), toString 테스트에 개수가 찍혔다는 단언 추가(재정의를 잠시 빼서 실패 확인), 로그 테스트에서 로거 레벨을 직접 INFO로 정함, temperature 2·NaN 경계, `application.yml` 값 확인(`applicationYmlHasDefaultTemperatureAndSeed`, yml 값은 이미 있어 수정 전 실패는 확인하지 않음. 처음에 yml 문서가 하나라고 잘못 가정해 실패했고, 첫 문서 값과 다른 문서가 덮어쓰지 않는지로 단언을 고침), 필드가 없는 담당자·기한은 세지 않음. 백엔드 346개 통과
 
 ### W9. eval 준비
 - `eval/cases/`에 가상 회의 `script.txt` 초안과 인젝션 케이스. `expected.json`·`planted.json`은 사용자가 작성(훅이 AI 수정을 막음)

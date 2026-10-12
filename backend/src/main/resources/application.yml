@@ -45,6 +45,9 @@ app:
     connect-timeout: 10s
     # Qwen3 생각 모드 끄기 (chat_template_kwargs.enable_thinking=false). Kanana는 false
     disable-thinking: true
+    # 정리 작업이라 샘플링을 낮은 temperature와 고정 seed로 둔다 (ADR 0002). seed는 0 이상(-1 무작위는 받지 않음)
+    temperature: 0.2
+    seed: 42
   # SPEC F2: 정리 프롬프트 버전 (prompts/summarize.{버전}.md). 바꾸기 전에 /eval로 비교한다
   summary:
     prompt-version: v2

@@ -5,10 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.ClassPathResource;
 
 class LlmPropertiesTest {
 
@@ -47,7 +51,7 @@ class LlmPropertiesTest {
 
         assertThatThrownBy(() -> new LlmProperties(LlmProvider.OPENAI_COMPATIBLE,
                 URI.create("http://127.0.0.1:8081/v1"), "test-model", keyWithCr, Duration.ofMinutes(5),
-                Duration.ofSeconds(10), true))
+                Duration.ofSeconds(10), true, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("LLM_API_KEY")
                 .message().doesNotContain(FAKE_KEY);
@@ -66,7 +70,7 @@ class LlmPropertiesTest {
     void toStringHidesApiKey() {
         LlmProperties properties = new LlmProperties(LlmProvider.OPENAI_COMPATIBLE,
                 URI.create("http://127.0.0.1:8081/v1"), "test-model", FAKE_KEY, Duration.ofMinutes(5),
-                Duration.ofSeconds(10), true);
+                Duration.ofSeconds(10), true, null, null);
 
         assertThat(properties.toString()).doesNotContain(FAKE_KEY).contains("test-model");
     }
@@ -108,5 +112,57 @@ class LlmPropertiesTest {
         runner.withPropertyValues("app.llm.api-key=" + FAKE_KEY, "app.llm.timeout=")
                 .run(context -> assertThat(context.getBean(LlmProperties.class).timeout())
                         .isEqualTo(Duration.ofMinutes(5)));
+    }
+
+    /** 정리 작업이라 샘플링은 낮은 temperature 0.2, 고정 seed 42가 기본이다 (ADR 0002). */
+    @Test
+    void defaultTemperatureAndSeed() {
+        runner.withPropertyValues("app.llm.api-key=" + FAKE_KEY)
+                .run(context -> {
+                    LlmProperties properties = context.getBean(LlmProperties.class);
+                    assertThat(properties.temperature()).isEqualTo(0.2);
+                    assertThat(properties.seed()).isEqualTo(42L);
+                });
+    }
+
+    @Test
+    void temperatureAndSeedFromSettings() {
+        runner.withPropertyValues("app.llm.api-key=" + FAKE_KEY, "app.llm.temperature=0", "app.llm.seed=0")
+                .run(context -> {
+                    LlmProperties properties = context.getBean(LlmProperties.class);
+                    assertThat(properties.temperature()).isEqualTo(0.0);
+                    assertThat(properties.seed()).isEqualTo(0L);
+                });
+        runner.withPropertyValues("app.llm.api-key=" + FAKE_KEY, "app.llm.temperature=2")
+                .run(context -> assertThat(context.getBean(LlmProperties.class).temperature()).isEqualTo(2.0));
+    }
+
+    /** 실행 설정(application.yml)의 값도 ADR 0002의 기본값과 같다. */
+    @Test
+    void applicationYmlHasDefaultTemperatureAndSeed() throws Exception {
+        List<PropertySource<?>> sources = new YamlPropertySourceLoader()
+                .load("application.yml", new ClassPathResource("application.yml"));
+
+        // 첫 문서가 기본 설정이고, 다른 문서(프로필별)는 이 값을 덮어쓰지 않는다
+        assertThat(String.valueOf(sources.get(0).getProperty("app.llm.temperature"))).isEqualTo("0.2");
+        assertThat(String.valueOf(sources.get(0).getProperty("app.llm.seed"))).isEqualTo("42");
+        assertThat(sources.subList(1, sources.size())).allSatisfy(source -> {
+            assertThat(source.getProperty("app.llm.temperature")).isNull();
+            assertThat(source.getProperty("app.llm.seed")).isNull();
+        });
+    }
+
+    /** temperature는 0~2, seed는 0 이상만 받는다 (llama-server의 -1은 무작위 seed라 고정이 아님). */
+    @Test
+    void temperatureOrSeedOutOfRangeFailsStartup() {
+        for (String setting : List.of("app.llm.temperature=-0.1", "app.llm.temperature=2.1", "app.llm.temperature=NaN",
+                "app.llm.seed=-1")) {
+            runner.withPropertyValues("app.llm.api-key=" + FAKE_KEY, setting)
+                    .run(context -> {
+                        assertThat(context).hasFailed();
+                        assertThat(context.getStartupFailure()).rootCause()
+                                .hasMessageContaining(setting.substring(0, setting.indexOf('=')));
+                    });
+        }
     }
 }

@@ -79,6 +79,9 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         body.put("response_format", Map.of(
                 "type", "json_schema",
                 "json_schema", Map.of("name", request.schemaName(), "strict", true, "schema", request.schema())));
+        // 같은 요청이면 같은 결과가 나오도록 샘플링을 고정한다 (ADR 0002)
+        body.put("temperature", properties.temperature());
+        body.put("seed", properties.seed());
         if (properties.disableThinking()) {
             body.put("chat_template_kwargs", Map.of("enable_thinking", false));
         }

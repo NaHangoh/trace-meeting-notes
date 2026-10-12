@@ -3,6 +3,8 @@ package tracenotes.summary;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -11,6 +13,7 @@ import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.json.JsonMapper;
@@ -230,6 +233,29 @@ class SummarizeServiceTest {
 
         assertThat(output.getAll()).contains("INVALID_OUTPUT").contains("retries=2");
         assertThat(output.getAll()).doesNotContain(MARKER).doesNotContain("secretOutputMarker");
+    }
+
+    /** 덩어리마다 검증이 지운 개수를 종류별로 로그에 남긴다. 항목 내용·담당자·기한은 남기지 않는다. */
+    @Test
+    void logsRemovedCountsWithoutContent(CapturedOutput output) {
+        respond(request -> "{\"items\":["
+                + "{\"type\":\"NOTE\",\"text\":\"" + MARKER + "1\",\"evidence\":[1],\"assignee\":null,\"due\":null},"
+                + "{\"type\":\"TODO\",\"text\":\"" + MARKER + "2\",\"evidence\":[1,99],"
+                + "\"assignee\":\"" + MARKER + "담당\",\"due\":\"" + MARKER + "기한\"}]}");
+
+        // 로그 레벨은 테스트 안에서 정한다 (testing.md)
+        Logger logger = (Logger) LoggerFactory.getLogger(SummarizeService.class);
+        Level previous = logger.getLevel();
+        logger.setLevel(Level.INFO);
+        try {
+            List<SummaryItem> result = service.summarize(List.of(new Utterance(1, "참석자", "할 일을 맡습니다.")));
+
+            assertThat(result).hasSize(1);
+        } finally {
+            logger.setLevel(previous);
+        }
+        assertThat(output.getAll()).contains("summary chunk 1/1 removed items=1 evidence=1 assignee=1 due=1");
+        assertThat(output.getAll()).doesNotContain(MARKER).doesNotContain("할 일을 맡습니다");
     }
 
     /** 실패 예외의 메시지에도 내용이 들어가지 않는다. */

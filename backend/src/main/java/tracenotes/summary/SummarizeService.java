@@ -12,7 +12,8 @@ import tracenotes.minutes.Utterance;
  * 정리 실행 (SPEC F2): 덩어리마다 LLM을 부르고, 응답을 검증해 덩어리 순서대로 이어 붙인다.
  * 형식 오류(응답이 JSON·스키마에 맞지 않음, OpenAI 형식이 아님)만 덩어리마다 최대 2회 다시 부른다.
  * 타임아웃·연결 실패·실행기 오류는 다시 부르지 않고 바로 실패한다. 한 덩어리가 실패하면 남은 덩어리는 부르지 않는다.
- * 로그에는 재시도 횟수와 실패 사유 종류(실행기 오류는 상태 코드)만 남긴다. 발언·응답 내용, 작업 ID는 남기지 않는다.
+ * 로그에는 재시도 횟수, 실패 사유 종류(실행기 오류는 상태 코드), 덩어리마다 검증이 지운 종류별 개수만 남긴다.
+ * 발언·응답 내용, 작업 ID는 남기지 않는다.
  */
 public class SummarizeService {
 
@@ -49,11 +50,14 @@ public class SummarizeService {
         int retries = 0;
         while (true) {
             try {
-                List<SummaryItem> items = validator.validate(llm.complete(builder.build(chunk)), chunk);
+                SummaryValidation validation = validator.check(llm.complete(builder.build(chunk)), chunk);
                 if (retries > 0) {
                     log.info("summary chunk {}/{} succeeded retries={}", index, total, retries);
                 }
-                return items;
+                SummaryValidation.Removed removed = validation.removed();
+                log.info("summary chunk {}/{} removed items={} evidence={} assignee={} due={}",
+                        index, total, removed.items(), removed.evidence(), removed.assignee(), removed.due());
+                return validation.items();
             } catch (InvalidSummaryOutputException e) {
                 retries = retryOrFail(retries);
             } catch (LlmCallException e) {

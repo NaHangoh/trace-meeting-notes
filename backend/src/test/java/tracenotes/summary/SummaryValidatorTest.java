@@ -271,6 +271,79 @@ class SummaryValidatorTest {
         });
     }
 
+    /**
+     * 지운 것을 종류별 개수로 돌려준다 (모델이 안 낸 것과 검증이 지운 것을 구분하려고).
+     * 항목: 버린 항목. 근거 번호: 남긴 항목에서 버린 번호(정수 아님, 덩어리 밖, 중복).
+     * 담당자·기한: 남긴 항목에서 값이 왔는데 비운 것(TODO가 아닌 항목의 값 포함). null로 온 값은 세지 않는다.
+     */
+    @Test
+    void countsRemovedByKind() {
+        // 버린 항목 안의 무효 근거·담당자·기한은 따로 세지 않는다
+        SummaryValidation validation = validator.check(items(
+                item("NOTE", "알 수 없는 종류", "[99,\"4\"]", "\"없는 사람\"", "\"내일\""),
+                item("DISCUSSION", "   ", "[99]", "\"없는 사람\"", "\"내일\""),
+                "\"객체 아님\"",
+                item("TODO", "할 일", "[3,99,\"4\",3,4]", "\"없는 사람\"", "\"내일\""),
+                item("DISCUSSION", "논의", "[3]", "\"참석자 A\"", "\"다음 주 금요일\""),
+                item("TODO", "보고서 제출", "[3,4]", "\"참석자 A\"", "\"다음 주 금요일\""),
+                item("TODO", "값 없음", "[5]", "null", "null"),
+                "{\"type\":\"TODO\",\"text\":\"필드 없음\",\"evidence\":[5]}"), CHUNK);
+
+        assertThat(validation.items()).extracting(SummaryItem::text)
+                .containsExactly("할 일", "논의", "보고서 제출", "값 없음", "필드 없음");
+        assertThat(validation.items().get(0).evidence()).containsExactly(3, 4);
+        assertThat(validation.removed()).isEqualTo(new SummaryValidation.Removed(3, 3, 2, 2));
+    }
+
+    /** 근거가 배열이 아닌 값으로 오면 버린 근거 1개로 센다 (담당자·기한처럼 값이 왔는데 버린 것). null·필드 없음은 세지 않는다. */
+    @Test
+    void nonArrayEvidenceCountsAsOneRemoved() {
+        SummaryValidation validation = validator.check(items(
+                item("DISCUSSION", "숫자", "3", "null", "null"),
+                item("DISCUSSION", "문자", "\"3\"", "null", "null"),
+                item("DISCUSSION", "null", "null", "null", "null"),
+                "{\"type\":\"DISCUSSION\",\"text\":\"필드 없음\",\"assignee\":null,\"due\":null}"), CHUNK);
+
+        assertThat(validation.items()).allSatisfy(item -> assertThat(item.evidence()).isEmpty());
+        assertThat(validation.removed()).isEqualTo(new SummaryValidation.Removed(0, 2, 0, 0));
+    }
+
+    @Test
+    void nothingRemovedIsAllZero() {
+        SummaryValidation validation = validator.check(
+                items(item("TODO", "보고서 제출", "[3,4]", "\"참석자 A\"", "\"다음 주 금요일\"")), CHUNK);
+
+        assertThat(validation.removed()).isEqualTo(new SummaryValidation.Removed(0, 0, 0, 0));
+    }
+
+    /** 100개를 넘는 항목도 버린 항목으로 센다. */
+    @Test
+    void itemsOverLimitAreCountedAsRemoved() {
+        // 넘친 항목 안의 무효 값은 세지 않는다
+        String[] many = IntStream.range(0, SummaryValidator.MAX_ITEMS + 2)
+                .mapToObj(i -> i < SummaryValidator.MAX_ITEMS
+                        ? item("DISCUSSION", "논의 " + i, "[3]", "null", "null")
+                        : item("TODO", "넘침 " + i, "[3,99]", "\"없는 사람\"", "\"내일\""))
+                .toArray(String[]::new);
+
+        SummaryValidation validation = validator.check(items(many), CHUNK);
+
+        assertThat(validation.items()).hasSize(SummaryValidator.MAX_ITEMS);
+        assertThat(validation.removed()).isEqualTo(new SummaryValidation.Removed(2, 0, 0, 0));
+    }
+
+    /** 개수 기록을 로그에 찍어도 개수만 나온다. */
+    @Test
+    void validationToStringHasCountsOnly() {
+        SummaryValidation validation = validator.check(
+                items(item("TODO", "비밀 안건", "[3,4]", "\"참석자 A\"", "\"다음 주 금요일\"")), CHUNK);
+
+        assertThat(validation.toString())
+                .contains("items=1")
+                .contains("removed=Removed[items=0, evidence=0, assignee=0, due=0]")
+                .doesNotContain("비밀 안건").doesNotContain("참석자 A").doesNotContain("금요일");
+    }
+
     /** 항목을 로그에 찍어도 내용·담당자가 나오지 않는다. */
     @Test
     void itemToStringHidesContent() {
