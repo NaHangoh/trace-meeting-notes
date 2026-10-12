@@ -12,10 +12,13 @@ import org.flywaydb.core.api.MigrationState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.env.Environment;
+import org.springframework.context.ApplicationContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ClassUtils;
 import tracenotes.summary.SummaryFailure;
 
 @SpringBootTest
@@ -28,7 +31,10 @@ class FlywayMigrationTest {
     JdbcTemplate jdbcTemplate;
 
     @Autowired
-    Environment environment;
+    ApplicationContext context;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Test
     void v1IsAppliedOnStartup() {
@@ -117,8 +123,11 @@ class FlywayMigrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    /** 엔티티 없이 JdbcTemplate만 쓴다. JPA(Hibernate)가 없으므로 스키마는 Flyway 마이그레이션만 바꾼다. */
     @Test
-    void hibernateDoesNotRunDdl() {
-        assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
+    void noJpaSoOnlyFlywayChangesSchema() {
+        assertThat(ClassUtils.isPresent("jakarta.persistence.EntityManagerFactory", null)).isFalse();
+        assertThat(context.containsBean("entityManagerFactory")).isFalse();
+        assertThat(transactionManager).isInstanceOf(DataSourceTransactionManager.class);
     }
 }
