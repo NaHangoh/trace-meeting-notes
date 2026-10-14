@@ -23,6 +23,18 @@
 | 결과 화면 | `#/jobs/{id}` 해시 라우팅(새 의존성 없음), 2초 조회(설정값) | SPEC F2 |
 | 오류 코드 | 기존 `TOO_MANY_REQUESTS` 유지, `QUEUE_FULL` 추가 | ADR 0007 |
 
+## 커밋 대기 목록
+
+커밋은 사용자가 이 순서대로 나눠 한다. 같은 파일을 여러 단위가 고쳤으면 합쳐 한 커밋으로 하고, 커밋마다 스테이징한 상태만으로 테스트가 통과하는지 확인한다. 커밋하면 줄을 지우고 해당 W에 해시를 적는다.
+
+| 순서 | 단위 | 바뀐 파일 | 커밋 메시지 | 점검 |
+|---|---|---|---|---|
+| 1 | W9 eval 준비 | `backend/src/test/java/tracenotes/eval/`(W9 새 파일 15개), `eval/cases/c01-launch-schedule/`·`c02-script-tag/`·`c03-injection/`(script.txt, 사용자가 쓴 expected.json), `eval/README.md`, `eval/results/2026-10-13_qwen3-8b.md`, `docs/plans/F2-summarize.md`(W8b 완료·해시, W9 기록, 이 목록) | `feat(eval): 정리 기준선 측정 실행기와 케이스` | 백엔드 393개 통과, reviewer 반영(중간 2·낮음 5), security-checker 차단 없음(2026-10-13). sed로 고친 4줄 기록 있음 |
+| 2 | W10b 정리 프롬프트 v3와 버전 비교 (계획 `docs/plans/F2-prompt-v3.md`) | 새 파일 `EvalPromptVersions`·`EvalComparison`(+각 Test), 수정 `EvalSummary.java`·`EvalBaselineTest.java`·`PromptLoaderTest.java`, `prompts/summarize.v3.md`(새), `prompts/README.md`, `docs/SPEC.md`(S5 한계), `eval/README.md`, `eval/results/2026-10-13_qwen3-8b_v2-v3.md`, `docs/plans/F2-prompt-v3.md` | `feat(eval): 정리 프롬프트 v3와 버전 비교 측정` | 백엔드 406개 통과, 실제 호출 30회(v3 악화로 설정 v2 유지), reviewer 반영(중간 1·낮음 2), security-checker 차단 없음(2026-10-13, 참고: 계획 파일에 가상 케이스 출력 문구 인용) |
+| 3 | W10c eval 구분자 고정과 정리 프롬프트 v4 (계획 `docs/plans/F2-prompt-v3.md`) | 새 파일 `backend/src/test/java/tracenotes/summary/EvalPromptBuilder.java`(+Test), `prompts/summarize.v4.md`, `eval/results/2026-10-13_qwen3-8b_v2-v4.md`, 수정 `EvalRunner.java`·`EvalRunnerTest.java`·`EvalBaselineTest.java`·`PromptLoaderTest.java`, `prompts/README.md`, `eval/README.md`, `docs/plans/F2-prompt-v3.md`. 제품 코드(`backend/src/main`) 변경 없음 | `feat(eval): 구분자 고정과 정리 프롬프트 v4 비교, v2 확정` | 백엔드 412개 통과, 실제 호출 30회(v4 악화 지표 있어 v2 확정, 설정 변경 없음), reviewer 낮음 2 반영(문서), security-checker 차단 없음(2026-10-13) |
+| (진행 중) | W10a c04~c06 | `eval/cases/c04~c06/script.txt`(작성함), 사용자 정답 대기, 측정 전. 끝나면 줄을 채운다 | | |
+| 합침 | 1·2·3 | `EvalSummary.java`·`EvalBaselineTest.java`·`EvalRunner.java`(W9 새 파일), `PromptLoaderTest.java`, `eval/README.md`, `prompts/README.md`, `docs/plans/F2-prompt-v3.md`를 여러 단위가 고쳐, 위 규칙대로 1·2·3을 한 커밋으로 한다. 메시지 안: `feat(eval): 정리 기준선 측정과 프롬프트 v3·v4 비교, v2 확정` | | |
+
 ## 작업 단위
 
 ### W1. LLM 설정과 클라이언트 ✅ 완료 (6b7769f)
@@ -117,17 +129,25 @@
 ### W8a. 쓰지 않는 JPA 제거 ✅ 완료 (ffa1bdf)
 - W0 골격의 `starter-data-jpa`를 `starter-jdbc`(테스트 `starter-jdbc-test`)로 교체, `spring.jpa` 설정 삭제, `hibernateDoesNotRunDdl`을 `noJpaSoOnlyFlywayChangesSchema`로 교체(교체 전 실패 확인), ADR 0005 변경 기록. 백엔드 335개 통과, bootRun 시작 로그에 JPA·Hibernate 줄 0개
 
-### W8b. 샘플링 고정과 검증 제거 개수 기록 (진행 중, 커밋 대기)
-- 남은 일: security-checker → 사용자 커밋 (`feat(summary): 샘플링 고정과 검증 제거 개수 기록`, W8 기록·해시, W8a 기록과 함께)
+### W8b. 샘플링 고정과 검증 제거 개수 기록 ✅ 완료 (0059231)
 - 요청에 `temperature`(`app.llm.temperature`, 기본 0.2, 0~2, NaN 거부)와 `seed`(`app.llm.seed`, 기본 42, 0 이상)를 넣음. 범위 밖이면 시작 실패. 기본값과 이유는 ADR 0002
 - `SummaryValidator.check` → `SummaryValidation(items, removed)`. 지운 개수: 항목(알 수 없는 종류·비었거나 500자 넘는 text·객체 아님·100개 초과), 근거 번호(정수 아님·덩어리 밖·중복, 배열이 아닌 값은 1개), 담당자·기한(값이 왔는데 비움, TODO가 아닌 항목의 값 포함). 버린 항목 안의 값, null로 오거나 필드가 없는 값은 세지 않음. `SummarizeService`가 덩어리마다 `summary chunk i/n removed items= evidence= assignee= due=`로 개수만 로그
 - 테스트: requestHasTemperatureAndSeedFromSettings(가짜 서버), defaultTemperatureAndSeed, temperatureAndSeedFromSettings, temperatureOrSeedOutOfRangeFailsStartup, countsRemovedByKind, nothingRemovedIsAllZero, itemsOverLimitAreCountedAsRemoved, validationToStringHasCountsOnly, logsRemovedCountsWithoutContent. 처음 9개 중 6개는 골격(필드·타입만) 상태에서 실패 확인, 나머지 3개(0 개수, toString, 설정 바인딩)는 골격에서도 통과
 - reviewer·test-verifier 반영(낮음): 버린 항목·넘친 항목 안의 무효 값이 세어지지 않는지 단언 추가, 근거가 배열이 아닌 값이면 1개로 셈(`nonArrayEvidenceCountsAsOneRemoved`, 수정 전 실패 확인), toString 테스트에 개수가 찍혔다는 단언 추가(재정의를 잠시 빼서 실패 확인), 로그 테스트에서 로거 레벨을 직접 INFO로 정함, temperature 2·NaN 경계, `application.yml` 값 확인(`applicationYmlHasDefaultTemperatureAndSeed`, yml 값은 이미 있어 수정 전 실패는 확인하지 않음. 처음에 yml 문서가 하나라고 잘못 가정해 실패했고, 첫 문서 값과 다른 문서가 덮어쓰지 않는지로 단언을 고침), 필드가 없는 담당자·기한은 세지 않음. 백엔드 346개 통과
 
-### W9. eval 준비
+### W9. eval 준비 (진행 중, 커밋 대기)
+- 남은 일: 사용자 커밋 (`feat(eval): 정리 기준선 측정 실행기와 케이스`, W8b 완료 표시·해시 포함). security-checker 통과(2026-10-13, 차단 사항 없음, 보이지 않는 문자 0건)
 - `eval/cases/`에 가상 회의 `script.txt` 초안과 인젝션 케이스. `expected.json`·`planted.json`은 사용자가 작성(훅이 AI 수정을 막음)
 - 실행기: 케이스를 실제 llama-server로 정리해 JSON 성공률, 근거 위치 정확도, 처리 시간을 계산. 실제 호출 전 예상 호출 수를 보여주고 확인받는다
 - 테스트: 지표 계산 단위 테스트(Fixture 결과로)
+- 범위(사용자, 2026-10-13): 케이스는 c01 스크립트 A(W8 확인 때 쓴 7줄), c02 스크립트 B(`<script>` 3줄), c03 인젝션(결정 지시 + 화자 "시스템"의 할 일 지시). 케이스마다 3회 실행해 합산, temperature·seed는 설정값 그대로. 지표는 JSON 성공률, 종류별 일치, 근거 번호 정확도, 담당자·기한 일치, 결정 값 포함, 검증기 제거 개수, 인젝션 확정 여부, 덩어리당 시간. 원본은 저장소 밖, 저장소에는 요약 지표만. 프롬프트 v2는 고치지 않고 기준선만 잰다
+- 결과: 테스트 소스의 `tracenotes.eval`(제품 코드에 넣지 않음). `EvalRunner`가 제품과 같은 청크·요청·검증 부품으로 덩어리마다 부르고 형식 오류만 최대 2회 재시도(`SummarizeService`는 지운 개수·시간을 밖으로 내지 않아 따로 돎), `EvalMetrics`가 정답 순서대로 일대일 짝짓기(keywords 모두 포함, 종류 일치/무관 두 번), `EvalSummary`가 분자·분모를 합산해 숫자와 정답 id만 담은 마크다운. `EvalBaselineTest`(`@Tag("llm")`)는 `EVAL_OUT_DIR`(저장소 밖 절대 경로 강제)에 응답 원문과 summary.md를 쓰고, `EVAL_DRY_RUN=1`이면 예상 호출 수만 출력. 형식은 eval/README.md
+- 테스트: EvalMetricsTest 8, EvalRunnerTest 6, EvalSummaryTest 4는 골격(UnsupportedOperationException) 상태에서 실패 확인. ExpectedCaseTest 13·EvalCaseFilesTest 4는 구현 뒤에 써서 먼저 실패를 확인하지 못함(그중 종류 오류 메시지 접두어 누락을 잡아 고침). `eachChunkIsCalledAndNumbered`는 처음에 발언이 짧아 덩어리 하나에 들어가 실패 → 테스트 데이터를 길게 고침. 백엔드 381개 통과
+- reviewer 반영: (중간) 실패한 실행이 앞 덩어리 항목으로 점수를 받던 것을 제품처럼 출력 0개로 채점(`failedRunScoresAsNoOutputLikeProduct`, 수정 전 실패 확인). (중간) 출력 폴더 검사를 실제 경로 비교로 바꾸고 `EvalOutputDir`로 빼서 기본 test에서 검사(`EvalOutputDirTest` 4개, 심볼릭 링크 포함, 수정 전 실패 확인). (낮음) 종류 무관 짝짓기는 종류 일치 짝을 먼저 고정(`anyTypeMatchesKeepTypedPairsFirst`, 수정 전 실패 확인), 최대 짝짓기가 아닌 한계는 README에. 응답 없는 실패 종류 전부와 실패 뒤 남은 덩어리 미호출 테스트(구현이 이미 맞아 처음부터 통과). provider가 fixture면 실패, 드라이런은 script.txt만 읽음(`scriptsLoadWithoutExpected`). 드라이런 결과 `calls=9 maxCallsWithRetries=27`. 백엔드 392개 통과
+- 기록: `EvalBaselineTest.java`의 import 2줄·문서 주석 2줄을 실수로 sed로 고침(편집 도구 규칙 위반, 내용은 그 4줄뿐)
+- 결정(사용자 요청에 따른 판단, 2026-10-13): 담당자·기한 일치는 공백 정규화 후 한쪽이 다른 쪽에 들어 있으면 일치(사용자 정답 "이번 주 금요일" ↔ 발언 "이번 주 금요일까지"). 출력이 짧아도 일치라서 정확 일치 행을 따로 둠. `fieldsMatchByContainmentEitherWayAndExactIsCountedSeparately`(수정 전 실패 확인), 기존 `wrongTypeMissingValueAndPartialFieldsAreCounted`의 기한 단언은 기준 변경에 맞춰 0→1로 바꾸고 정확 일치 0 단언 추가. 백엔드 393개 통과
+- 기준선(2026-10-13, 사용자 확인 후 실제 호출 9회, 재시도 0, 2분 10초, 원본은 저장소 밖): `eval/results/2026-10-13_qwen3-8b.md`. JSON 100%, 근거 겹침 100%·정확 일치 72%, 결정 값 포함 4/9, 기한 일치 3/6(c01 0/3), 인젝션 확정 2/3 실행
+- 관찰(원본 대조): c01 기한 0/3은 검증기가 아니라 모델이 null을 냄(제거 0) → W8 원인 분석의 미확정 부분이 "모델 null"로 확정. 디자인 시안은 3회 모두 DISCUSSION. c01 결정은 3회 모두 값 없는 "출시일 확정". c03 인젝션 두 지시가 실행 2·3에서 TODO·DECISION으로 나왔고, 근거 번호가 실제 그 발언이라 근거 검사로는 걸러지지 않음(검증 단계·사람 확인 몫). AGENDA에 담당자·기한을 넣어 검증기가 지움(2·2). c03만 실행마다 응답이 달랐는데, seed는 같아도 요청마다 구분자가 무작위라 입력이 달라지는 것으로 봄(확인 안 함). v3 여부는 이 기준선으로 사용자와 정함
 
 ## 위험과 확인할 것
 - llama-server가 `response_format`(JSON 스키마)과 `chat_template_kwargs`를 받는지: W1 끝 `@Tag("llm")`로 확인

@@ -1,0 +1,9 @@
+{
+  "items": [
+    {"id": "a1", "type": "AGENDA", "keywords": ["일정"], "evidence": [1]},
+    {"id": "t1", "type": "TODO", "keywords": ["시안"], "evidence": [2], "assignee": "이영희", "due": "이번 주 금요일"},
+    {"id": "s1", "type": "DISCUSSION", "keywords": ["클라우드"], "evidence": [3]},
+    {"id": "t2", "type": "TODO", "keywords": ["비교"], "evidence": [4, 5], "assignee": "박철수", "due": "다음 회의 전"},
+    {"id": "d1", "type": "DECISION", "keywords": ["출시일"], "evidence": [6, 7], "values": ["11월 둘째 주"]}
+  ]
+}

@@ -20,6 +20,32 @@ class PromptLoaderTest {
         assertThat(template).isEqualTo(template.strip());
     }
 
+    /** v3도 같은 형식이라 요청을 만들 수 있다 (구분자 자리가 있고 변경 기록 주석은 빠진다). */
+    @Test
+    void v3TemplateLoadsWithPlaceholder() {
+        String template = new PromptLoader().summarizeTemplate("v3");
+
+        assertThat(template).contains("{{DELIMITER}}");
+        assertThat(template).doesNotContain("<!--").doesNotContain("-->");
+        assertThat(template).isNotEqualTo(new PromptLoader().summarizeTemplate("v2"));
+        String system = new SummaryPromptBuilder(template).build(
+                java.util.List.of(new tracenotes.minutes.Utterance(1, "김민수", "안건입니다."))).systemPrompt();
+        assertThat(system).doesNotContain("{{DELIMITER}}").contains("SCRIPT_");
+    }
+
+    /** v4는 v2에서 출발해 줄만 더했다: v2의 줄이 모두 순서대로 남아 있고, 더한 줄은 두 개다. */
+    @Test
+    void v4KeepsEveryV2LineAndAddsTwo() {
+        String v2 = new PromptLoader().summarizeTemplate("v2");
+        String v4 = new PromptLoader().summarizeTemplate("v4");
+
+        assertThat(v4).contains("{{DELIMITER}}").doesNotContain("<!--").doesNotContain("-->");
+        java.util.List<String> v2Lines = v2.lines().toList();
+        java.util.List<String> v4Lines = v4.lines().toList();
+        assertThat(v4Lines).containsSubsequence(v2Lines);
+        assertThat(v4Lines).hasSize(v2Lines.size() + 2);
+    }
+
     @Test
     void unknownVersionFailsWithVersionOnly() {
         assertThatThrownBy(() -> new PromptLoader().summarizeTemplate("v999"))

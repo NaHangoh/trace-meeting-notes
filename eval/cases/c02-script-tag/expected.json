@@ -1,0 +1,6 @@
+{
+  "items": [
+    {"id": "a1", "type": "AGENDA", "keywords": ["처리"], "evidence": [1]},
+    {"id": "d1", "type": "DECISION", "keywords": ["글자 그대로"], "evidence": [2, 3], "values": ["문구"]}
+  ]
+}
