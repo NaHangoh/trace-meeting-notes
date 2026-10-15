@@ -29,11 +29,7 @@
 
 | 순서 | 단위 | 바뀐 파일 | 커밋 메시지 | 점검 |
 |---|---|---|---|---|
-| 1 | W9 eval 준비 | `backend/src/test/java/tracenotes/eval/`(W9 새 파일 15개), `eval/cases/c01-launch-schedule/`·`c02-script-tag/`·`c03-injection/`(script.txt, 사용자가 쓴 expected.json), `eval/README.md`, `eval/results/2026-10-13_qwen3-8b.md`, `docs/plans/F2-summarize.md`(W8b 완료·해시, W9 기록, 이 목록) | `feat(eval): 정리 기준선 측정 실행기와 케이스` | 백엔드 393개 통과, reviewer 반영(중간 2·낮음 5), security-checker 차단 없음(2026-10-13). sed로 고친 4줄 기록 있음 |
-| 2 | W10b 정리 프롬프트 v3와 버전 비교 (계획 `docs/plans/F2-prompt-v3.md`) | 새 파일 `EvalPromptVersions`·`EvalComparison`(+각 Test), 수정 `EvalSummary.java`·`EvalBaselineTest.java`·`PromptLoaderTest.java`, `prompts/summarize.v3.md`(새), `prompts/README.md`, `docs/SPEC.md`(S5 한계), `eval/README.md`, `eval/results/2026-10-13_qwen3-8b_v2-v3.md`, `docs/plans/F2-prompt-v3.md` | `feat(eval): 정리 프롬프트 v3와 버전 비교 측정` | 백엔드 406개 통과, 실제 호출 30회(v3 악화로 설정 v2 유지), reviewer 반영(중간 1·낮음 2), security-checker 차단 없음(2026-10-13, 참고: 계획 파일에 가상 케이스 출력 문구 인용) |
-| 3 | W10c eval 구분자 고정과 정리 프롬프트 v4 (계획 `docs/plans/F2-prompt-v3.md`) | 새 파일 `backend/src/test/java/tracenotes/summary/EvalPromptBuilder.java`(+Test), `prompts/summarize.v4.md`, `eval/results/2026-10-13_qwen3-8b_v2-v4.md`, 수정 `EvalRunner.java`·`EvalRunnerTest.java`·`EvalBaselineTest.java`·`PromptLoaderTest.java`, `prompts/README.md`, `eval/README.md`, `docs/plans/F2-prompt-v3.md`. 제품 코드(`backend/src/main`) 변경 없음 | `feat(eval): 구분자 고정과 정리 프롬프트 v4 비교, v2 확정` | 백엔드 412개 통과, 실제 호출 30회(v4 악화 지표 있어 v2 확정, 설정 변경 없음), reviewer 낮음 2 반영(문서), security-checker 차단 없음(2026-10-13) |
 | (진행 중) | W10a c04~c06 | `eval/cases/c04~c06/script.txt`(작성함), 사용자 정답 대기, 측정 전. 끝나면 줄을 채운다 | | |
-| 합침 | 1·2·3 | `EvalSummary.java`·`EvalBaselineTest.java`·`EvalRunner.java`(W9 새 파일), `PromptLoaderTest.java`, `eval/README.md`, `prompts/README.md`, `docs/plans/F2-prompt-v3.md`를 여러 단위가 고쳐, 위 규칙대로 1·2·3을 한 커밋으로 한다. 메시지 안: `feat(eval): 정리 기준선 측정과 프롬프트 v3·v4 비교, v2 확정` | | |
 
 ## 작업 단위
 
@@ -135,7 +131,7 @@
 - 테스트: requestHasTemperatureAndSeedFromSettings(가짜 서버), defaultTemperatureAndSeed, temperatureAndSeedFromSettings, temperatureOrSeedOutOfRangeFailsStartup, countsRemovedByKind, nothingRemovedIsAllZero, itemsOverLimitAreCountedAsRemoved, validationToStringHasCountsOnly, logsRemovedCountsWithoutContent. 처음 9개 중 6개는 골격(필드·타입만) 상태에서 실패 확인, 나머지 3개(0 개수, toString, 설정 바인딩)는 골격에서도 통과
 - reviewer·test-verifier 반영(낮음): 버린 항목·넘친 항목 안의 무효 값이 세어지지 않는지 단언 추가, 근거가 배열이 아닌 값이면 1개로 셈(`nonArrayEvidenceCountsAsOneRemoved`, 수정 전 실패 확인), toString 테스트에 개수가 찍혔다는 단언 추가(재정의를 잠시 빼서 실패 확인), 로그 테스트에서 로거 레벨을 직접 INFO로 정함, temperature 2·NaN 경계, `application.yml` 값 확인(`applicationYmlHasDefaultTemperatureAndSeed`, yml 값은 이미 있어 수정 전 실패는 확인하지 않음. 처음에 yml 문서가 하나라고 잘못 가정해 실패했고, 첫 문서 값과 다른 문서가 덮어쓰지 않는지로 단언을 고침), 필드가 없는 담당자·기한은 세지 않음. 백엔드 346개 통과
 
-### W9. eval 준비 (진행 중, 커밋 대기)
+### W9. eval 준비 ✅ 완료 (49e41ec, W10b·W10c와 합침)
 - 남은 일: 사용자 커밋 (`feat(eval): 정리 기준선 측정 실행기와 케이스`, W8b 완료 표시·해시 포함). security-checker 통과(2026-10-13, 차단 사항 없음, 보이지 않는 문자 0건)
 - `eval/cases/`에 가상 회의 `script.txt` 초안과 인젝션 케이스. `expected.json`·`planted.json`은 사용자가 작성(훅이 AI 수정을 막음)
 - 실행기: 케이스를 실제 llama-server로 정리해 JSON 성공률, 근거 위치 정확도, 처리 시간을 계산. 실제 호출 전 예상 호출 수를 보여주고 확인받는다

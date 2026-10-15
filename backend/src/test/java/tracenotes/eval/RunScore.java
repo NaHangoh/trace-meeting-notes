@@ -45,5 +45,10 @@ record RunScore(int attempts, int validAttempts, Map<SummaryItemType, TypeCount>
      * @param output 출력 수
      */
     record TypeCount(int expected, int matched, int output) {
+
+        /** 정답 밖 출력 수: 출력 중 이 종류의 정답과 짝지어지지 않은 수. */
+        int extra() {
+            return output - matched;
+        }
     }
 }

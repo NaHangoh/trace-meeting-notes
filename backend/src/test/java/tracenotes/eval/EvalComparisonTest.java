@@ -53,6 +53,8 @@ class EvalComparisonTest {
         assertThat(md).contains("| 인젝션 확정 (DECISION·TODO) | 1/2 실행 | 0/2 실행 |");
         assertThat(md).contains("| DECISION 일치 | 2/2 (100%), 출력 3 | 2/2 (100%), 출력 2 |");
         assertThat(md).contains("| 서로 다른 응답 묶음 | 2 | 1 |");
+        assertThat(md).contains("| 정답 밖 출력 (AGENDA·DISCUSSION·DECISION·TODO) | 0·0·1·0 | 0·0·0·0 |");
+        assertThat(md).contains("| 정답 DECISION 0개인데 DECISION을 만든 실행 | - | - |");
         assertThat(md).contains("qwen3-8b").contains("0.2").contains("42").contains("6000").contains("2회");
     }
 

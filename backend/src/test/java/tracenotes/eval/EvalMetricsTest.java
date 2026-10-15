@@ -143,6 +143,84 @@ class EvalMetricsTest {
         assertThat(missing.dueCorrect()).isZero();
     }
 
+    private static RunScore todoWithAssignee(String expectedAssignee, String outputAssignee) {
+        ExpectedItem shared = new ExpectedItem("t1", SummaryItemType.TODO, List.of("시안"), List.of(5, 6), List.of(),
+                expectedAssignee, null);
+        return EvalMetrics.score(new ExpectedCase(List.of(shared), null), outcome(List.of(
+                item(SummaryItemType.TODO, "디자인 시안 검토", List.of(5, 6), outputAssignee, null))));
+    }
+
+    /** 정답 담당자가 여러 명이면 이름으로 나눠 비교한다. 구분자·순서는 상관없고, 한 명이라도 빠지면 틀림. */
+    @Test
+    void multipleAssigneesMatchByNamesRegardlessOfSeparatorAndOrder() {
+        String expected = "문태오, 배하린";
+
+        RunScore same = todoWithAssignee(expected, "문태오, 배하린");
+        RunScore middleDot = todoWithAssignee(expected, "문태오·배하린");
+        RunScore reversed = todoWithAssignee(expected, "배하린, 문태오");
+        RunScore slash = todoWithAssignee(expected, "배하린 / 문태오");
+        RunScore withAnd = todoWithAssignee(expected, "문태오 및 배하린");
+        RunScore oneMissing = todoWithAssignee(expected, "문태오");
+        RunScore withTitle = todoWithAssignee(expected, "문태오 님, 배하린 님");
+        RunScore joinedByParticle = todoWithAssignee(expected, "문태오와 배하린");
+        RunScore extraName = todoWithAssignee(expected, "문태오, 배하린, 한지훈");
+
+        for (RunScore score : List.of(same, middleDot, reversed, slash, withAnd)) {
+            assertThat(score.assigneeCorrect()).isEqualTo(1);
+            assertThat(score.assigneeExact()).isEqualTo(1);
+        }
+        assertThat(oneMissing.assigneeCorrect()).isZero();
+        assertThat(oneMissing.assigneeExact()).isZero();
+        // 넓은 기준은 출력을 나누지 않고 정답 이름이 모두 들어 있는지만 본다. 정확 기준은 이름 묶음이 같아야 한다
+        assertThat(withTitle.assigneeCorrect()).isEqualTo(1);
+        assertThat(withTitle.assigneeExact()).isZero();
+        // "와/과"는 구분자가 아니다
+        assertThat(joinedByParticle.assigneeCorrect()).isEqualTo(1);
+        assertThat(joinedByParticle.assigneeExact()).isZero();
+        assertThat(extraName.assigneeCorrect()).isEqualTo(1);
+        assertThat(extraName.assigneeExact()).isZero();
+    }
+
+    /** 정답 쪽도 같은 구분자로 나눈다. "및"은 띄어 쓸 때만 구분자다. */
+    @Test
+    void expectedAssigneeSplitsOnEverySeparator() {
+        RunScore slash = todoWithAssignee("문태오/배하린 및 한지훈", "한지훈, 배하린, 문태오");
+        RunScore unspacedAnd = todoWithAssignee("문태오및배하린", "문태오, 배하린");
+
+        assertThat(slash.assigneeCorrect()).isEqualTo(1);
+        assertThat(slash.assigneeExact()).isEqualTo(1);
+        assertThat(unspacedAnd.assigneeCorrect()).isZero();
+        assertThat(unspacedAnd.assigneeExact()).isZero();
+    }
+
+    /** 정답 담당자가 한 명이면 기존 기준 그대로: 한쪽이 다른 쪽에 들어 있으면 일치, 정확 일치는 같은 문자열. */
+    @Test
+    void singleAssigneeKeepsContainmentEitherWay() {
+        RunScore longerOutput = todoWithAssignee("이영희", "이영희, 박철수");
+        RunScore shorterOutput = todoWithAssignee("이영희 님", "이영희");
+
+        assertThat(longerOutput.assigneeCorrect()).isEqualTo(1);
+        assertThat(longerOutput.assigneeExact()).isZero();
+        assertThat(shorterOutput.assigneeCorrect()).isEqualTo(1);
+        assertThat(shorterOutput.assigneeExact()).isZero();
+    }
+
+    /** 정답 밖 출력 수 = 종류별 출력 수 − 짝지어진 수. 정답이 없는 종류에 만든 항목도 센다. */
+    @Test
+    void extraOutputsAreCountedPerType() {
+        RunScore score = EvalMetrics.score(EXPECTED, outcome(List.of(
+                item(SummaryItemType.AGENDA, "다음 달 출시 일정", List.of(1), null, null),
+                item(SummaryItemType.DISCUSSION, "디자인 시안 마무리", List.of(2), null, null),
+                item(SummaryItemType.DISCUSSION, "클라우드 비용", List.of(3), null, null),
+                item(SummaryItemType.DECISION, "출시일 11월 둘째 주", List.of(6, 7), null, null),
+                item(SummaryItemType.DECISION, "회의 시간 단축", List.of(3), null, null))));
+
+        assertThat(score.byType().get(SummaryItemType.AGENDA).extra()).isZero();
+        assertThat(score.byType().get(SummaryItemType.DISCUSSION).extra()).isEqualTo(2);
+        assertThat(score.byType().get(SummaryItemType.DECISION).extra()).isEqualTo(1);
+        assertThat(score.byType().get(SummaryItemType.TODO).extra()).isZero();
+    }
+
     @Test
     void nullAssigneeMatchesExpectedNull() {
         ExpectedItem noOwner = new ExpectedItem("t9", SummaryItemType.TODO, List.of("예약"), List.of(1),

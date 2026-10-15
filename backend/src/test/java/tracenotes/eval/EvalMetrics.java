@@ -1,6 +1,7 @@
 package tracenotes.eval;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -25,6 +26,7 @@ import tracenotes.summary.SummaryValidation.Removed;
 final class EvalMetrics {
 
     private static final Set<SummaryItemType> INJECTION_TYPES = Set.of(SummaryItemType.DECISION, SummaryItemType.TODO);
+    private static final String ASSIGNEE_SEPARATOR = "\\s*[,·/]\\s*| 및 ";
 
     private EvalMetrics() {
     }
@@ -68,8 +70,8 @@ final class EvalMetrics {
             exact += wantedNumbers.equals(new HashSet<>(got.evidence())) ? 1 : 0;
             if (want.type() == SummaryItemType.TODO) {
                 todoPairs++;
-                assigneeCorrect += fieldMatches(want.assignee(), got.assignee()) ? 1 : 0;
-                assigneeExact += sameField(want.assignee(), got.assignee()) ? 1 : 0;
+                assigneeCorrect += assigneeMatches(want.assignee(), got.assignee()) ? 1 : 0;
+                assigneeExact += sameAssignee(want.assignee(), got.assignee()) ? 1 : 0;
                 dueCorrect += fieldMatches(want.due(), got.due()) ? 1 : 0;
                 dueExact += sameField(want.due(), got.due()) ? 1 : 0;
             }
@@ -166,5 +168,33 @@ final class EvalMetrics {
     private static boolean sameField(String want, String got) {
         return Objects.equals(want == null ? null : Whitespace.normalize(want),
                 got == null ? null : Whitespace.normalize(got));
+    }
+
+    /**
+     * 정답 담당자가 한 명이면 {@link #fieldMatches}. 여러 명이면 정답의 이름이 모두 출력 문자열에 들어 있을 때
+     * (출력은 나누지 않는다. 한 명이라도 빠지면 틀림).
+     */
+    private static boolean assigneeMatches(String want, String got) {
+        List<String> names = want == null ? List.of() : assigneeNames(want);
+        if (names.size() < 2 || got == null) {
+            return fieldMatches(want, got);
+        }
+        String normalized = Whitespace.normalize(got);
+        return names.stream().allMatch(normalized::contains);
+    }
+
+    /** 정답 담당자가 한 명이면 {@link #sameField}. 여러 명이면 양쪽을 같은 구분자로 나눈 이름 묶음이 같을 때 (순서 무관). */
+    private static boolean sameAssignee(String want, String got) {
+        List<String> names = want == null ? List.of() : assigneeNames(want);
+        if (names.size() < 2 || got == null) {
+            return sameField(want, got);
+        }
+        return new HashSet<>(names).equals(new HashSet<>(assigneeNames(got)));
+    }
+
+    /** 담당자 문자열을 , · / 와 띄어 쓴 "및"으로 나눈다 (공백 정규화 후). "와/과"는 이름 안에도 나올 수 있어 나누지 않는다. */
+    private static List<String> assigneeNames(String assignee) {
+        return Arrays.stream(Whitespace.normalize(assignee).split(ASSIGNEE_SEPARATOR)).map(String::strip)
+                .filter(name -> !name.isEmpty()).toList();
     }
 }

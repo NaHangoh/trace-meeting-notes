@@ -1,6 +1,7 @@
 package tracenotes.eval;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -64,6 +65,9 @@ final class EvalSummary {
             metrics.add(new Metric(type + " 일치", s -> ratio(sum(s, r -> r.byType().get(type).matched()),
                     sum(s, r -> r.byType().get(type).expected())) + ", 출력 " + sum(s, r -> r.byType().get(type).output())));
         }
+        metrics.add(new Metric("정답 밖 출력 (AGENDA·DISCUSSION·DECISION·TODO)", s -> Arrays.stream(SummaryItemType.values())
+                .map(type -> String.valueOf(sum(s, r -> r.byType().get(type).extra()))).collect(Collectors.joining("·"))));
+        metrics.add(new Metric("정답 DECISION 0개인데 DECISION을 만든 실행", EvalSummary::inventedDecision));
         metrics.add(new Metric("종류 무관 일치",
                 s -> ratio(sum(s, RunScore::matchedAnyType), sum(s, EvalSummary::expectedCount))));
         metrics.add(new Metric("근거 겹침", s -> ratio(sum(s, RunScore::evidenceOverlap), sum(s, RunScore::evidencePairs))));
@@ -157,6 +161,16 @@ final class EvalSummary {
             return "-";
         }
         return values.stream().filter(Boolean::booleanValue).count() + "/" + values.size() + " 실행";
+    }
+
+    /** 정답에 DECISION이 없는 실행만 센다 (결정 없이 끝난 회의). 하나도 없으면 "-". */
+    private static String inventedDecision(List<RunScore> scores) {
+        List<TypeCount> decisions = scores.stream().map(s -> s.byType().get(SummaryItemType.DECISION))
+                .filter(d -> d.expected() == 0).toList();
+        if (decisions.isEmpty()) {
+            return "-";
+        }
+        return decisions.stream().filter(d -> d.output() > 0).count() + "/" + decisions.size() + " 실행";
     }
 
     private static String chunkTime(List<RunScore> scores) {

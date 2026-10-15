@@ -2,6 +2,7 @@ package tracenotes.eval;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tracenotes.eval.ExpectedCase.ExpectedItem;
@@ -64,6 +65,30 @@ class EvalSummaryTest {
         assertThat(md).contains("| 놓친 정답 (id×횟수) | t1×1 |");
         assertThat(md).contains("| 서로 다른 응답 묶음 | 2 |");
         assertThat(md).contains("| 완료한 실행 | 2/2 |");
+        // 둘째 실행의 "연봉 인상" DECISION 하나가 정답 밖
+        assertThat(md).contains("| 정답 밖 출력 (AGENDA·DISCUSSION·DECISION·TODO) | 0·0·1·0 |");
+        // 이 케이스는 정답에 DECISION이 있어 대상 실행이 없다
+        assertThat(md).contains("| 정답 DECISION 0개인데 DECISION을 만든 실행 | - |");
+    }
+
+    /** 결정 없이 끝난 회의: 정답에 DECISION이 없는 실행만 분모로 센다. 다른 케이스와 합친 전체 칸도 같다. */
+    @Test
+    void decisionMadeWithoutExpectedDecisionCountsRuns() {
+        ExpectedCase noDecision = new ExpectedCase(List.of(TODO), null);
+        RunScore invented = EvalMetrics.score(noDecision, new RunOutcome(List.of(
+                new SummaryItem(SummaryItemType.DECISION, "장소 확정", List.of(5), null, null),
+                new SummaryItem(SummaryItemType.DECISION, "시간 확정", List.of(6), null, null)),
+                List.of(new Attempt(1, 1000, true, new Removed(0, 0, 0, 0))), null));
+        RunScore clean = EvalMetrics.score(noDecision, new RunOutcome(List.of(
+                new SummaryItem(SummaryItemType.TODO, "회의실 예약", List.of(8, 9), "이영희", "목요일까지")),
+                List.of(new Attempt(1, 1000, true, new Removed(0, 0, 0, 0))), null));
+        List<EvalSummary.CaseRuns> runs = new ArrayList<>(cases());
+        runs.add(new EvalSummary.CaseRuns("c05-no-decision", List.of(invented, clean), 2));
+
+        String md = EvalSummary.markdown(HEADER, runs);
+
+        assertThat(md).contains("| 정답 DECISION 0개인데 DECISION을 만든 실행 | - | 1/2 실행 | 1/2 실행 |");
+        assertThat(md).contains("| 정답 밖 출력 (AGENDA·DISCUSSION·DECISION·TODO) | 0·0·1·0 | 0·0·2·0 | 0·0·3·0 |");
     }
 
     @Test
